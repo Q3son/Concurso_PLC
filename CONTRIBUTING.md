@@ -6,8 +6,8 @@ Gracias por sumarte. Este repositorio es la solución del equipo para el Smart F
 ## Puesta en marcha
 
 ```bash
-git clone https://github.com/TU-USUARIO/smart-factory-challenge.git
-cd smart-factory-challenge/hmi
+git clone https://github.com/Q3son/Concurso_PLC.git
+cd Concurso_PLC/hmi
 npm install
 npm test        # debe terminar en verde
 npm run demo    # http://localhost:3000

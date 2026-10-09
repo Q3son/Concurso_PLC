@@ -39,8 +39,8 @@ por color, máquinas de tapas/bases, segregación y conteo) está trazada a su c
 Requisitos: [Node.js 18+](https://nodejs.org) y [VS Code](https://code.visualstudio.com).
 
 ```bash
-git clone https://github.com/TU-USUARIO/smart-factory-challenge.git
-cd smart-factory-challenge/hmi
+git clone https://github.com/Q3son/Concurso_PLC.git
+cd Concurso_PLC/hmi
 npm install
 npm run demo
 ```

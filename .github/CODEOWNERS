@@ -1,7 +1,7 @@
 # Responsables de revisión por carpeta. GitHub pedirá automáticamente su revisión en cada pull request.
-# 1. Reemplaza TU-USUARIO por el usuario de quien coordina.
+# 1. Reemplaza Q3son por el usuario de quien coordina.
 # 2. Quita el "#" de cada línea y pon el usuario de GitHub del responsable de esa área.
-*                 @TU-USUARIO
+*                 @Q3son
 # /plc/           @usuario-plc
 # /factoryio/     @usuario-integracion
 # /hmi/           @usuario-hmi

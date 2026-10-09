@@ -14,23 +14,23 @@ git config --global core.autocrlf true      # solo en Windows
 
 ## 7.2 Crear el repositorio (lo hace una sola persona)
 
-1. Entra a <https://github.com/new>. Nombre: `smart-factory-challenge`.
+1. Entra a <https://github.com/new>. Nombre: `Concurso_PLC`.
    Si el equipo tiene una organización en GitHub (por ejemplo la del capítulo estudiantil), créalo ahí.
 2. Descripción: *Celda de manufactura con CODESYS, Factory I/O, Modbus TCP, OPC UA y HMI web con gemelo digital. HRFEST 2026.*
 3. Público. **No** marques README, .gitignore ni licencia (ya vienen en el proyecto).
 4. Desde la carpeta del proyecto descomprimido:
 
 ```bash
-cd smart-factory-challenge
+cd Concurso_PLC
 git init
 git add .
 git commit -m "feat: celda de tapas y bases con segregación por color (rev. C)"
 git branch -M main
-git remote add origin https://github.com/TU-USUARIO/smart-factory-challenge.git
+git remote add origin https://github.com/Q3son/Concurso_PLC.git
 git push -u origin main
 ```
 
-5. Reemplaza `TU-USUARIO` en `README.md` (insignias y enlaces) y en `.github/CODEOWNERS`.
+5. Reemplaza `Q3son` en `README.md` (insignias y enlaces) y en `.github/CODEOWNERS`.
 
 ## 7.3 Agregar a los colaboradores
 
@@ -39,8 +39,8 @@ git push -u origin main
 3. Cada integrante acepta la invitación desde su correo y clona el repositorio:
 
 ```bash
-git clone https://github.com/TU-USUARIO/smart-factory-challenge.git
-cd smart-factory-challenge/hmi
+git clone https://github.com/Q3son/Concurso_PLC.git
+cd Concurso_PLC/hmi
 npm install
 npm test
 ```
@@ -111,7 +111,7 @@ Cada *pull request* debe cerrar un *issue* (`Closes #12` en la descripción).
 
 1. **Settings > Pages**, *Source*: **GitHub Actions**.
 2. En **Actions**, abre "Demo en GitHub Pages" y pulsa **Run workflow** (o haz un push a `main`).
-3. En uno o dos minutos la demo queda en `https://TU-USUARIO.github.io/smart-factory-challenge/`.
+3. En uno o dos minutos la demo queda en `https://q3son.github.io/Concurso_PLC/`.
 
 ## 7.9 Detalles que se notan
 
