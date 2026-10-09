@@ -90,6 +90,16 @@ export const AO = Object.freeze([
   { addr: 0, key: 'display', code: 'D1', plc: 'iDisplay', fio: 'Digital Display', label: 'Display: productos terminados' },
 ]);
 
+// Direcciones IEC que CODESYS asigna al "ModbusTCP Server Device" (pestaña Asignación E/S).
+// GVL_IO las usa con AT %... ; si CODESYS cambia el inicio (p. ej. al agregar otro dispositivo), se ajusta aquí y en GVL_IO.
+export const PLC_BASE = Object.freeze({ coilsByte: 4, discreteInputsByte: 4, holdingWord: 0, inputRegWord: 0 });
+export function plcAddress(kind, addr) {
+  if (kind === 'DI') return `%IX${PLC_BASE.coilsByte + Math.floor(addr / 8)}.${addr % 8}`;
+  if (kind === 'DO') return `%QX${PLC_BASE.discreteInputsByte + Math.floor(addr / 8)}.${addr % 8}`;
+  if (kind === 'AI') return `%IW${PLC_BASE.holdingWord + addr}`;
+  return `%QW${PLC_BASE.inputRegWord + addr}`;
+}
+
 export const IO_SUMMARY = Object.freeze({
   di: DI.length, ai: AI.length, do: DO.length, ao: AO.length,
   processSensors: DI.filter((d) => d.zone).length,

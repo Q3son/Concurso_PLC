@@ -6,7 +6,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { DI, AI, DO, AO } from '../public/js/iomap.js';
+import { DI, AI, DO, AO, plcAddress } from '../public/js/iomap.js';
 import { READ_TAGS, COMMANDS } from '../src/tags.js';
 import { DEFAULT_PARAM } from '../public/js/control.js';
 import { ALARMS } from '../public/js/constants.js';
@@ -14,12 +14,12 @@ import { ALARMS } from '../public/js/constants.js';
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const st = (rel) => readFileSync(path.join(root, 'plc/codesys', rel), 'utf8');
 
-// Variables declaradas en un GVL: "nombre : TIPO ...; (* comentario *)"
+// Variables declaradas en un GVL: "nombre [AT %dir] : TIPO ...; (* comentario *)"
 function gvlVars(src) {
   const out = new Map();
   for (const line of src.split('\n')) {
-    const m = line.match(/^\s*([A-Za-z_]\w*)\s*:\s*([A-Za-z_][\w()\[\].\s]*?)\s*(?::=\s*([^;]+))?;\s*(?:\(\*(.*)\*\))?/);
-    if (m && !/^(VAR|END_VAR|TYPE|END_TYPE)/.test(m[1])) out.set(m[1], { type: m[2].trim(), init: m[3]?.trim(), comment: m[4] || '' });
+    const m = line.match(/^\s*([A-Za-z_]\w*)\s*(?:AT\s+(%\S+)\s*)?:\s*([A-Za-z_][\w()\[\].\s]*?)\s*(?::=\s*([^;]+))?;\s*(?:\(\*(.*)\*\))?/);
+    if (m && !/^(VAR|END_VAR|TYPE|END_TYPE)/.test(m[1])) out.set(m[1], { at: m[2], type: m[3].trim(), init: m[4]?.trim(), comment: m[5] || '' });
   }
   return out;
 }
@@ -32,14 +32,15 @@ const GVL = {
 
 test('GVL_IO coincide con iomap.js (nombre, orden y dirección Modbus)', () => {
   const ordered = [...GVL.GVL_IO.entries()];
-  const groups = [['BOOL', DI, 0], ['INT', AI, DI.length], ['BOOL', DO, DI.length + AI.length], ['INT', AO, DI.length + AI.length + DO.length]];
-  for (const [type, list, offset] of groups) {
+  const groups = [['BOOL', DI, 0, 'DI'], ['INT', AI, DI.length, 'AI'], ['BOOL', DO, DI.length + AI.length, 'DO'], ['INT', AO, DI.length + AI.length + DO.length, 'AO']];
+  for (const [type, list, offset, kind] of groups) {
     list.forEach((d, i) => {
       const [name, v] = ordered[offset + i] ?? [];
       assert.equal(name, d.plc, `posición ${offset + i}: se esperaba ${d.plc}`);
       assert.equal(v.type, type, `${d.plc} es ${type}`);
       const addr = Number(v.comment.trim().split(/\s+/)[0]);
       assert.equal(addr, d.addr, `${d.plc}: dirección Modbus del comentario`);
+      assert.equal(v.at, plcAddress(kind, d.addr), `${d.plc}: dirección AT del canal Modbus`);
     });
   }
   assert.equal(ordered.length, DI.length + AI.length + DO.length + AO.length, 'sin variables de más en GVL_IO');

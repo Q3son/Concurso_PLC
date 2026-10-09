@@ -17,18 +17,33 @@
 
 ## 4.3 Modbus TCP con Factory I/O (opción A, recomendada)
 
-1. Clic derecho en **Device > Add Device > Ethernet Adapter > Ethernet**. Elige la interfaz
-   (para todo en la misma PC sirve loopback `127.0.0.1` o tu adaptador real).
-2. Clic derecho en **Ethernet > Add Device > Modbus > Modbus TCP Slave Device**.
-3. En su configuración:
-   - Puerto **502**, Unit ID **1**
-   - Áreas de bits (*Discrete bit areas*): **Coils = 34**, **Discrete Inputs = 32**
-   - **Holding Registers = 2**, **Input Registers = 1**
-4. En **Modbus TCP Slave Device I/O Mapping** enlaza cada canal a su variable con el botón `…`
-   (*mapear a variable existente*), por ejemplo `Coils bit 6 → GVL_IO.xS2_Feed1Ready`.
-   **Todas** las señales van a este mismo dispositivo: hay un solo PLC.
-   La tabla completa, en orden, está en [02-mapa-io.md](02-mapa-io.md).
-5. Activa **Always update variables** (*Enabled 2: always in bus cycle task*).
+Probado en CODESYS V3.5 SP22. En versiones nuevas el "esclavo" se llama **servidor**.
+
+1. **Conectar con el PLC virtual:** doble clic en *Device* > *Ajustes de comunicación* >
+   **Examinar red**, elige tu PC y pulsa Enter hasta que el círculo quede verde. La primera vez
+   pide crear un usuario (grupo *Administrator*).
+2. Clic derecho en **Device > Agregar dispositivo > Adaptadores de bus de campo > Ethernet Adapter > Ethernet**.
+   Doble clic en *Ethernet* > **Browse…** y elige el adaptador con IP (Wi-Fi o cable). No marques
+   *Ajustar las configuraciones del sistema operativo*.
+3. Clic derecho en **Ethernet > Agregar dispositivo > Modbus > Dispositivo servidor TCP Modbus >
+   ModbusTCP Server Device**. (Si solo aparece *Modbus COM Port*, el destino seleccionado es *Device* y no *Ethernet*.)
+4. Pestaña **General** del servidor:
+
+| Campo | Valor |
+|---|---|
+| Puerto del servidor | `502` |
+| Unir a adaptador | desmarcado (escucha en todas las interfaces; Factory I/O puede usar `127.0.0.1`) |
+| Registros Holding | `2` (%IW), *De escritura* desmarcado |
+| Registro de entrada | `2` (%QW; SP22 no acepta 1, el segundo queda libre) |
+| Áreas de bits discretos | marcado: **Bobinas `34`** (%IX), **Entradas discretas `32`** (%QX) |
+| Direcciones de inicio | todas en `0` |
+
+5. **No hace falta mapear canal por canal:** `GVL_IO` fija cada variable a su dirección con `AT`
+   (Bobinas → `%IX4.0…%IX8.1`, Holding → `%IW0…1`, Entradas discretas → `%QX4.0…%QX7.7`,
+   Registro de entrada 0 → `%QW0`). Comprueba en la pestaña **Asignación E/S** que CODESYS asignó
+   esas mismas direcciones (*Bobinas[0]* = `%IB4`, *Entradas discretas[0]* = `%QB4`). Si fueran otras,
+   ajusta `PLC_BASE` en `hmi/public/js/iomap.js` y las `AT` de `GVL_IO`, y ejecuta `npm test`.
+6. En **Asignación E/S**, *Actualizar siempre las variables* → **Activado 2 (siempre en la tarea de ciclo del bus)**.
 
 ### Opción B (si tu versión no tiene áreas de bits)
 

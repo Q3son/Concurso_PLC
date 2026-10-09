@@ -3,15 +3,15 @@
 import { writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { DI, AI, DO, AO, IO_SUMMARY } from '../hmi/public/js/iomap.js';
+import { DI, AI, DO, AO, IO_SUMMARY, plcAddress } from '../hmi/public/js/iomap.js';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const ZONE = { 1: 'Alimentación', 2: 'Identificación', 3: 'Mecanizado', 4: 'Segregación' };
-const table = (rows, head) => [
+const table = (rows, head, kind) => [
   `| ${head.join(' | ')} |`, `|${head.map(() => '---').join('|')}|`,
-  ...rows.map((d) => `| ${d.addr} | ${d.code} | \`${d.plc}\` | ${d.fio} | ${d.label} | ${d.zone ? ZONE[d.zone] : 'Panel'} |`),
+  ...rows.map((d) => `| ${d.addr} | \`${plcAddress(kind, d.addr)}\` | ${d.code} | \`${d.plc}\` | ${d.fio} | ${d.label} | ${d.zone ? ZONE[d.zone] : 'Panel'} |`),
 ].join('\n');
-const H = ['Dir.', 'Código', 'Variable `GVL_IO`', 'Tag en Factory I/O', 'Función', 'Zona'];
+const H = ['Modbus', 'PLC', 'Código', 'Variable `GVL_IO`', 'Tag en Factory I/O', 'Función', 'Zona'];
 
 const md = `# 2. Mapa de entradas y salidas
 
@@ -21,25 +21,26 @@ const md = `# 2. Mapa de entradas y salidas
 
 Todas las señales llegan al **mismo PLC**. Los códigos (S5, M3, Y02…) son los del
 [plano de distribución](img/plano-celda.png) y del [plano de hardware](img/plano-hardware.png).
-Las direcciones son las del dispositivo **Modbus TCP Slave Device** de CODESYS
-([04-codesys.md](04-codesys.md)): Factory I/O **escribe** los sensores en *Coils* y *Holding Registers*
-y **lee** los actuadores en *Discrete Inputs* e *Input Registers*.
+La columna **Modbus** es la dirección que usa Factory I/O y **PLC** la dirección IEC que CODESYS
+asigna al **ModbusTCP Server Device** ([04-codesys.md](04-codesys.md)). \`GVL_IO\` fija cada variable a
+su canal con \`AT\`, así que no hay que mapear canal por canal. Factory I/O **escribe** los sensores en
+*Coils* y *Holding Registers* y **lee** los actuadores en *Discrete Inputs* e *Input Registers*.
 
 ## Entradas digitales: ${DI.length} (Coils 0 a ${DI.length - 1})
 
-${table(DI, H)}
+${table(DI, H, 'DI')}
 
 ## Entradas de registro: ${AI.length} (Holding Registers)
 
-${table(AI, H)}
+${table(AI, H, 'AI')}
 
 ## Salidas digitales: ${DO.length} (Discrete Inputs 0 a ${DO.length - 1})
 
-${table(DO, H)}
+${table(DO, H, 'DO')}
 
 ## Salida de registro: ${AO.length} (Input Register)
 
-${table(AO, H)}
+${table(AO, H, 'AO')}
 
 ## Resumen frente a las bases
 
