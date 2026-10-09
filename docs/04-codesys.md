@@ -46,7 +46,12 @@ El programa no cambia: solo cambia el mapeo hacia `GVL_IO`.
 
 ## 4.4 Importar el código
 
-El código fuente está en `plc/codesys/`. Crea los objetos **en este orden** (clic derecho en
+**Forma rápida (recomendada):** con el proyecto guardado en `plc/codesys/project/`, ejecuta
+*Herramientas > Scripting > Ejecutar archivo de script…* y elige `plc/codesys/importar_codesys.py`.
+Crea las carpetas y los 26 objetos y reemplaza `PLC_PRG`. Si cambias un `.st`, vuelve a
+ejecutarlo: actualiza sin duplicar.
+
+**Forma manual:** el código fuente está en `plc/codesys/`. Crea los objetos **en este orden** (clic derecho en
 *Application > Add Object*) y pega el contenido de cada archivo:
 
 | Orden | Carpeta | Tipo de objeto | Archivos |
