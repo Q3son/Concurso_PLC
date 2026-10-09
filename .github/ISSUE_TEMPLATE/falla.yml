@@ -1,0 +1,29 @@
+name: Falla
+description: Algo no funciona como debería (PLC, escena, tablero o documentación)
+labels: ["falla"]
+body:
+  - type: dropdown
+    id: area
+    attributes:
+      label: Área
+      options: [PLC (CODESYS), Escena Factory I/O, Tablero HMI, Gemelo digital / pruebas, Documentación]
+    validations:
+      required: true
+  - type: textarea
+    id: pasos
+    attributes:
+      label: Pasos para reproducirla
+      placeholder: "1. Selector en Auto\n2. Start\n3. ..."
+    validations:
+      required: true
+  - type: textarea
+    id: esperado
+    attributes:
+      label: Qué esperabas y qué pasó
+    validations:
+      required: true
+  - type: input
+    id: alarma
+    attributes:
+      label: Alarma o estado mostrado (si aplica)
+      placeholder: "Alarma 12, estado FAULT"

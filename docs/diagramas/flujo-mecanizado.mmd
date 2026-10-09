@@ -1,0 +1,15 @@
+flowchart TD
+  A(["Pieza en la rama M4 / M5 (FIFO de colores)"]) --> B{"¿S8 / S9 ocupado?"}
+  B -- "sí" --> H["La rama se detiene: la bahía de entrada tiene pieza"]
+  B -- "no" --> R["La rama avanza (solo si su FIFO tiene piezas)"]
+  H --> C{"¿MC libre y en marcha?<br/>Start = TRUE · Is Busy = FALSE"}
+  C -- "sí" --> L["El robot toma la pieza: S8 / S9 baja<br/>color = FIFO.pop → pieza dentro de la máquina"]
+  L --> M["Mecanizado: tapa 6 s en MC1 · base 3 s en MC2<br/>Progress 0 → 100 %"]
+  M --> F["Is Busy baja: producto en la bahía de salida<br/>contador de M6 / M8 + 1"]
+  F --> O["M6 / M8 avanzan (producto azul sigue de largo)"]
+  O --> V{"¿S10 / S11 ve<br/>producto verde?"}
+  V -- "sí" --> CE["Centrado tDiverterCenter · M6 / M8 se detienen"] --> P["Y03 / Y04 empujan a M7 / M9"] --> CG["S13 / S15 cuentan el verde"]
+  V -- "no" --> CB["S12 / S14 cuentan el azul"]
+  CG --> K["KPI: productos/min, conteo por tipo, ocupación de MC1 y MC2"]
+  CB --> K
+  C -- "error o puerta abierta" --> AL["Alarmas 13 a 16 · estado FAULT · MC recibe Stop"]

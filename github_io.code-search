@@ -1,0 +1,23 @@
+# Query: github.io
+# ContextLines: 1
+
+4 results - 3 files
+
+README.md:
+  11  [![CI](https://github.com/Q3son/Concurso_PLC/actions/workflows/ci.yml/badge.svg)](https://github.com/Q3son/Concurso_PLC/actions/workflows/ci.yml)
+  12: [![Demo](https://img.shields.io/badge/demo-en%20vivo-23784a)](https://q3son.github.io/Concurso_PLC/)
+  13  [![IEC 61131-3](https://img.shields.io/badge/IEC%2061131--3-Structured%20Text-2d5f9f)](plc/codesys)
+
+  15  
+  16: [**Probar la demo**](https://q3son.github.io/smart-factory-challenge/) ·
+  17  [Correcciones aplicadas](docs/00-bases-y-correcciones.md) ·
+
+docs\07-github-y-colaboracion.md:
+  113  2. En **Actions**, abre "Demo en GitHub Pages" y pulsa **Run workflow** (o haz un push a `main`).
+  114: 3. En uno o dos minutos la demo queda en `https://q3son.github.io/smart-factory-challenge/`.
+  115  
+
+hmi\public\js\app.js:
+  336  const params = new URLSearchParams(location.search);
+  337: const staticHost = location.hostname.endsWith('github.io') || location.protocol === 'file:';
+  338  if (staticHost || params.has('demo')) startDemo();

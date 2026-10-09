@@ -1,0 +1,12 @@
+flowchart TD
+  A(["Condición de alarma (24 en GVL_Alarm)"]) --> B{"Clase"}
+  B -- "EMERGENCY (1)" --> E["Estado EMERGENCY<br/>todas las salidas en reposo<br/>MC1 y MC2 reciben Stop"]
+  B -- "FAULT (2 a 21)" --> F["Estado FAULT<br/>torre roja intermitente"]
+  B -- "WARNING (22 a 24)" --> W["Aviso: la celda sigue<br/>torre amarilla intermitente"]
+  E --> R{"¿Seta liberada<br/>y Reset?"}
+  F --> R2{"¿Causa resuelta<br/>y Reset?"}
+  R -- "sí" --> I["IDLE: lista para Start"]
+  R2 -- "sí" --> I
+  R -- "no" --> E
+  R2 -- "no" --> F
+  W --> RW["Reset la reconoce cuando la causa desaparece"]

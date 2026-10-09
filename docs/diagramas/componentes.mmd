@@ -1,0 +1,29 @@
+flowchart TB
+  subgraph CAMPO["Planta virtual: Factory I/O"]
+    direction LR
+    SEN["Sensores<br/>S2, S4, S5, S7, S8, S9 difusos<br/>S6.1, S6.2, S10, S11 visión<br/>S12 a S15 capacitivos<br/>LS1 a LS8 finales de carrera"]
+    ACT["Actuadores<br/>E1, E2 · M1 a M9<br/>Y01 a Y04 · WS1 (+, L, R)<br/>MC1, MC2 (Start, Stop, Reset, Lids)"]
+    PAN["Panel del operador<br/>PB1 a PB3, ES1, SW1<br/>H1 a H6, D1"]
+  end
+  subgraph PLC["PLC único: CODESYS Control Win V3"]
+    direction LR
+    IO["GVL_IO<br/>34 DI · 32 DO · 3 registros"]
+    PRG["PLC_PRG<br/>máquina de estados + 4 zonas"]
+    FB["Bloques reutilizables<br/>FB_FeederStation ×2 · FB_WheelSorter<br/>FB_MachiningCenter ×2 · FB_ColorDiverter ×2<br/>FB_Conveyor ×7 · FB_Pusher ×4<br/>FB_AlarmManager · FB_Kpi"]
+    Q["Seguimiento<br/>FIFO de colores por rama"]
+    HMIV["GVL_HMI / GVL_Param<br/>comandos, estado, lote, KPI"]
+    IO <--> PRG
+    PRG --> FB
+    PRG --> Q
+    PRG <--> HMIV
+  end
+  subgraph SUP["Supervisión"]
+    direction LR
+    SRV["server.js<br/>cliente OPC UA"]
+    WEB["Tablero web<br/>sinóptico 2D, gemelo 3D,<br/>alarmas, lote, KPI"]
+    ARD["Arduino opcional<br/>botonera física"]
+    SRV <-- "WebSocket" --> WEB
+    ARD -. "USB serie" .-> SRV
+  end
+  CAMPO <-- "Modbus TCP :502" --> PLC
+  PLC <-- "OPC UA :4840" --> SUP

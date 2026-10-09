@@ -1,0 +1,14 @@
+flowchart TD
+  A["1. Entradas y comandos<br/>panel de Factory I/O + tablero (handshake)"] --> B["2. Modo y lote<br/>Auto / Manual · X verdes, Y azules"]
+  B --> C["3. Alarmas<br/>24 condiciones → FB_AlarmManager"]
+  C --> D{"4. ¿Emergencia o falla?"}
+  D -- "sí" --> E["EMERGENCY / FAULT<br/>se quitan todos los permisos"]
+  D -- "no" --> F["Máquina de estados<br/>IDLE · AUTO_RUN · AUTO_STOP · MANUAL"]
+  E --> G["5. Permisivos y vaciado de seguimiento"]
+  F --> G
+  G --> H["6. Zona 1: alimentación y unión<br/>FB_FeederStation ×2 · turno · S5"]
+  H --> I["7. Zona 2: M3 + identificación + WS1<br/>FB_WheelSorter (regla por color)"]
+  I --> J["8. Zonas 3 y 4 (FOR k := 1 TO 2)<br/>rama · FB_MachiningCenter · FB_ColorDiverter · conteo"]
+  J --> K["9. Salidas físicas y torre de luces"]
+  K --> L["10. KPI y estado para el HMI"]
+  L -- "se repite cada 10 ms" --> A

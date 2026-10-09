@@ -1,0 +1,33 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  hmi:
+    name: Pruebas de lógica y HMI
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: hmi
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: hmi/package-lock.json
+      - run: npm ci --omit=optional
+      - name: Verificar sintaxis
+        run: |
+          node --check server.js
+          for f in src/*.js public/js/*.js ../tools/*.mjs; do node --check "$f"; done
+      - name: Pruebas automáticas (gemelo digital + coherencia con el PLC)
+        run: npm test
+      - name: Documentación generada al día (mapa de E/S y planos)
+        run: |
+          npm run mapa-io
+          npm run plano
+          git diff --exit-code -- ../docs/02-mapa-io.md ../docs/img/plano-celda.svg ../docs/img/plano-hardware.svg \
+            || (echo "::error::Regenera la documentación: cd hmi && npm run mapa-io && npm run plano" && exit 1)

@@ -1,0 +1,19 @@
+name: Tarea
+description: Trabajo concreto con responsable y fecha
+labels: ["tarea"]
+body:
+  - type: textarea
+    id: que
+    attributes:
+      label: Qué hay que hacer
+    validations:
+      required: true
+  - type: textarea
+    id: listo
+    attributes:
+      label: Criterio de terminado
+      placeholder: "- [ ] npm test en verde\n- [ ] Probado en Factory I/O\n- [ ] Documentación actualizada"
+  - type: input
+    id: fecha
+    attributes:
+      label: Fecha límite

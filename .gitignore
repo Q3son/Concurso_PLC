@@ -1,0 +1,23 @@
+# Node
+node_modules/
+npm-debug.log*
+*.log
+
+# Variables de entorno (credenciales)
+.env
+
+# CODESYS: archivos temporales y de compilacion (el .project SI se versiona)
+*.~u
+*.opt
+*.bak
+*.backup
+*.compileinfo
+*.precompilecache
+*.bootinfo
+*.bootinfo_guids
+
+# Sistema operativo / editores
+.DS_Store
+Thumbs.db
+desktop.ini
+.idea/

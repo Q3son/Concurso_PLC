@@ -1,0 +1,18 @@
+stateDiagram-v2
+  direction LR
+  [*] --> OPERACION
+  state "En operación (con permisos)" as OPERACION {
+    direction LR
+    [*] --> IDLE
+    IDLE --> AUTO_RUN: Start, pushers en reposo
+    AUTO_RUN --> AUTO_STOP: Stop o lote completo
+    AUTO_STOP --> AUTO_RUN: Start (si el lote no terminó)
+    AUTO_STOP --> IDLE: línea vacía o 90 s
+    IDLE --> MANUAL: selector en Manual
+    MANUAL --> IDLE: selector en Auto (vacía seguimiento)
+  }
+  OPERACION --> FAULT: alarma de falla
+  FAULT --> OPERACION: causa resuelta y Reset
+  OPERACION --> EMERGENCY: seta ES1 o HMI
+  FAULT --> EMERGENCY: seta ES1 o HMI
+  EMERGENCY --> OPERACION: seta liberada y Reset

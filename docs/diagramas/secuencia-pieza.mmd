@@ -1,0 +1,26 @@
+sequenceDiagram
+  autonumber
+  participant P as Planta (Factory I/O)
+  participant F as FB_FeederStation 1
+  participant U as PLC_PRG (unión)
+  participant W as FB_WheelSorter
+  participant M as FB_MachiningCenter 1
+  participant D as FB_ColorDiverter 1
+  P->>F: S2 = TRUE (crudo verde al final de M1)
+  F->>F: centra tFeederCenter, detiene M1
+  U->>F: xPushPermit (S5 libre, separación, turno = 1)
+  F->>P: Y01 extiende hasta LS1 y retrae hasta LS2
+  P->>U: S5 flanco ↑ (confirmación antes de 4 s)
+  U->>P: M3 marcha (hay piezas en la faja)
+  P->>W: S6.1 = TRUE en el punto de lectura
+  W->>W: 1.er verde → destino TAPAS
+  W->>P: WS1 (+) y Left, luego M3 avanza
+  P->>W: S7 ↑ y ↓ (pieza entregada a M4)
+  W->>U: xDone → FIFO tapas + VERDE, regla verde → bases
+  P->>M: S8 = TRUE, robot la toma (S8 ↓), Is Busy = TRUE
+  M->>U: xLoaded → color en MC1 = VERDE
+  P->>M: Is Busy ↓ (tapa terminada en la bahía de salida)
+  M->>U: xFinished → piezas en M6 + 1
+  P->>D: S10 = TRUE (Green Product Lid)
+  D->>P: detiene M6, Y03 empuja a M7
+  P->>U: S13 ↑ → tapas verdes + 1, KPI

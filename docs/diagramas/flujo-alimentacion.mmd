@@ -1,0 +1,19 @@
+flowchart TD
+  A(["Cada ciclo del PLC (10 ms)"]) --> B{"¿AUTO_RUN?"}
+  B -- "no" --> X["Emisores, M1, M2, Y01 e Y02 en reposo<br/>(en AUTO_STOP no entra material nuevo)"]
+  B -- "sí" --> L{"¿El lote permite<br/>este color?"}
+  L -- "no" --> X2["Ese emisor y su faja se detienen"]
+  L -- "sí" --> F["M1 / M2 avanzan hasta que S2 / S4 ve una pieza<br/>y la centran frente al pusher (tFeederCenter)"]
+  F --> G{"¿Unión libre?<br/>S5 libre · M3 avanzó tMergeGap<br/>· cupo en M3 · ningún empuje pendiente"}
+  G -- "no" --> W["La pieza espera centrada"]
+  G -- "sí" --> T{"¿Las dos fajas<br/>tienen pieza lista?"}
+  T -- "solo una" --> P["Empuja la que está lista"]
+  T -- "las dos" --> TU{"¿De quién es el turno?"}
+  TU -- "faja 1" --> P1["Y01 empuja el crudo verde"]
+  TU -- "faja 2" --> P2["Y02 empuja el crudo azul"]
+  P --> C
+  P1 --> C
+  P2 --> C
+  C["El turno pasa a la otra faja<br/>se cuenta la pieza del lote<br/>se espera la confirmación"] --> S5{"¿S5 ve la pieza<br/>antes de 4 s?"}
+  S5 -- "sí" --> OK["iOnMain + 1 · M3 marcha<br/>empieza la separación"]
+  S5 -- "no" --> AL["Alarma 10: transferencia no confirmada<br/>estado FAULT"]

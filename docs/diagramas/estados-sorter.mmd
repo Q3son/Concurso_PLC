@@ -1,0 +1,11 @@
+stateDiagram-v2
+  direction LR
+  [*] --> IDLE
+  IDLE --> PREPARE: color leído y cupo en la rama destino
+  IDLE --> IDLE: rama llena (M3 retenida)
+  IDLE --> ERROR: S7 sin color leído (alarma 11)
+  PREPARE --> TRANSFER: tSorterSettle (ruedas orientadas)
+  TRANSFER --> DONE: S7 sube y baja
+  TRANSFER --> ERROR: más de tSorterTimeout (alarma 12)
+  DONE --> IDLE: FIFO de la rama + 1, alterna la regla del color
+  ERROR --> IDLE: Reset

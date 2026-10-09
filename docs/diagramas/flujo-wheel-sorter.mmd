@@ -1,0 +1,20 @@
+flowchart TD
+  A(["Pieza llega al punto de lectura de M3"]) --> V{"S6.1 / S6.2"}
+  V -- "solo S6.1" --> G["Color = VERDE"]
+  V -- "solo S6.2" --> B["Color = AZUL"]
+  V -- "ninguno" --> U["La pieza sigue hasta WS1 sin clasificar"] --> E11["S7 la detecta en IDLE<br/>Alarma 11: pieza no identificada"]
+  G --> RG{"¿El verde anterior<br/>fue a tapas?"}
+  B --> RB{"¿El azul anterior<br/>fue a tapas?"}
+  RG -- "no (o es el primero)" --> DT["Destino: TAPAS"]
+  RG -- "sí" --> DB["Destino: BASES"]
+  RB -- "no (o es el primero)" --> DT
+  RB -- "sí" --> DB
+  DT --> CAP{"¿Cupo en la rama destino?<br/>(iBranchCapacity)"}
+  DB --> CAP
+  CAP -- "no" --> H["M3 se retiene con la pieza en lectura<br/>aviso 22 si pasa de 30 s"]
+  H --> CAP
+  CAP -- "sí" --> P["PREPARE: WS1 (+) y Left/Right<br/>M3 espera tSorterSettle"]
+  P --> TR["TRANSFER: M3 avanza<br/>la pieza pasa por S7"]
+  TR --> D{"¿S7 sube y baja<br/>antes de 6 s?"}
+  D -- "sí" --> DONE["DONE: la pieza entra a su rama (FIFO)<br/>se invierte la regla de ese color"]
+  D -- "no" --> E12["Alarma 12: tiempo de transferencia excedido"]

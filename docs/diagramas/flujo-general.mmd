@@ -1,0 +1,42 @@
+flowchart TB
+  subgraph Z1["Zona 1 · Alimentación"]
+    direction LR
+    E1["E1 crudo verde"] --> M1["M1 faja 1"] --> S2{"S2<br/>¿pieza lista?"}
+    E2["E2 crudo azul"] --> M2["M2 faja 2"] --> S4{"S4<br/>¿pieza lista?"}
+    S2 -- "sí y turno" --> Y01["Y01 empuja"]
+    S4 -- "sí y turno" --> Y02["Y02 empuja"]
+    Y01 --> S5{"S5<br/>¿cayó en M3?"}
+    Y02 --> S5
+  end
+  subgraph Z2["Zona 2 · Identificación"]
+    direction LR
+    M3["M3 faja principal<br/>se mueve si hay piezas"] --> V{"S6.1 / S6.2<br/>¿verde o azul?"}
+    V --> R{"Regla por color<br/>¿1.ª, 3.ª, 5.ª…?"}
+    R -- "impar" --> WL["WS1 Left"]
+    R -- "par" --> WR["WS1 Right"]
+  end
+  subgraph Z3["Zona 3 · Mecanizado"]
+    direction LR
+    M4["M4 rama de tapas"] --> MC1["MC1 tapas · 6 s"]
+    M5["M5 rama de bases"] --> MC2["MC2 bases · 3 s"]
+  end
+  subgraph Z4["Zona 4 · Segregación y conteo"]
+    direction LR
+    MC1o["M6 salida tapas"] --> V1{"S10<br/>¿tapa verde?"}
+    V1 -- "sí" --> Y03["Y03 → M7"] --> C13["S13 cuenta<br/>tapas verdes"]
+    V1 -- "no, azul" --> C12["S12 cuenta<br/>tapas azules"]
+    MC2o["M8 salida bases"] --> V2{"S11<br/>¿base verde?"}
+    V2 -- "sí" --> Y04["Y04 → M9"] --> C15["S15 cuenta<br/>bases verdes"]
+    V2 -- "no, azul" --> C14["S14 cuenta<br/>bases azules"]
+  end
+  S5 -- "sí" --> M3
+  WL --> M4
+  WR --> M5
+  MC1 --> MC1o
+  MC2 --> MC2o
+  classDef verde fill:#e3f1e8,stroke:#3d8a55,color:#1d2227
+  classDef azul fill:#e2eaf7,stroke:#2f63b0,color:#1d2227
+  classDef maq fill:#fff4e5,stroke:#c77a1a,color:#1d2227
+  class E1,M1,S2,Y01,Y03,C13,Y04,C15 verde
+  class E2,M2,S4,Y02,C12,C14 azul
+  class MC1,MC2 maq

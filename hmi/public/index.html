@@ -1,0 +1,250 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Smart Factory — Tablero de control</title>
+  <meta name="description" content="HMI en tiempo real de la celda Smart Factory: crudos verde y azul a tapas y bases segregadas por color (CODESYS + Factory I/O).">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='6' fill='%231d2227'/><rect x='5' y='18' width='22' height='5' fill='%23d6d9dc'/><rect x='8' y='9' width='7' height='7' fill='%233d8a55'/><rect x='17' y='9' width='7' height='7' fill='%232f63b0'/></svg>">
+  <link rel="stylesheet" href="styles.css">
+  <script type="importmap">
+    { "imports": { "three": "./vendor/three/three.module.min.js", "three/addons/": "./vendor/three/addons/" } }
+  </script>
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="brand-name">Smart Factory Challenge</span>
+      <span class="brand-sub">Crudos verde y azul → tapas y bases segregadas por color</span>
+    </div>
+    <div class="state" id="state" data-tone="idle">
+      <span class="state-mark" aria-hidden="true"></span>
+      <div>
+        <div class="state-short" id="stateShort">Conectando…</div>
+        <div class="state-long" id="stateLong">Buscando el controlador</div>
+      </div>
+    </div>
+    <dl class="meta">
+      <div><dt>Modo</dt><dd id="metaMode">—</dd></div>
+      <div><dt>Origen de datos</dt><dd id="metaSource">—</dd></div>
+      <div><dt>Hora</dt><dd id="metaClock">—</dd></div>
+    </dl>
+  </header>
+
+  <div class="banner" id="banner" hidden>
+    <div class="banner-text">
+      <strong id="bannerTitle"></strong>
+      <span id="bannerHelp"></span>
+    </div>
+    <button type="button" class="btn btn-reset" data-cmd="reset">Reset</button>
+  </div>
+
+  <div class="notice" id="notice" hidden></div>
+
+  <main class="layout">
+    <!-- ================= Celda ================= -->
+    <section class="panel synoptic" aria-labelledby="synTitle">
+      <div class="panel-head">
+        <h2 id="synTitle" class="panel-title">Celda en vivo</h2>
+        <div class="tabs" role="tablist" aria-label="Vista de la celda">
+          <button type="button" role="tab" class="tab" id="tab2d" aria-selected="true" aria-controls="view2d">Sinóptico 2D</button>
+          <button type="button" role="tab" class="tab" id="tab3d" aria-selected="false" aria-controls="view3d">Gemelo 3D</button>
+        </div>
+      </div>
+      <div class="view" id="view2d" role="tabpanel" aria-labelledby="tab2d"></div>
+      <div class="view view-3d" id="view3d" role="tabpanel" aria-labelledby="tab3d" hidden>
+        <div class="view3d-tools">
+          <label class="check"><input type="checkbox" id="chkLabels" checked> Etiquetas</label>
+          <button type="button" class="link" id="btnView">Vista inicial</button>
+        </div>
+      </div>
+      <ul class="legend" aria-label="Leyenda">
+        <li><span class="chip raw c-G"></span>Crudo verde</li>
+        <li><span class="chip raw c-B"></span>Crudo azul</li>
+        <li><span class="chip lid c-G"></span>Tapa</li>
+        <li><span class="chip base c-B"></span>Base</li>
+        <li><span class="dot dot-on"></span>Sensor activo</li>
+        <li><span class="vis"></span>Sensor de visión</li>
+      </ul>
+    </section>
+
+    <!-- ================= Mando ================= -->
+    <aside class="side">
+      <section class="panel" aria-labelledby="ctlTitle">
+        <h2 id="ctlTitle" class="panel-title">Mando</h2>
+        <div class="controls">
+          <button type="button" class="btn btn-start" data-cmd="start" id="btnStart">Arrancar</button>
+          <button type="button" class="btn" data-cmd="stop" id="btnStop">Parar</button>
+          <button type="button" class="btn" data-cmd="reset" id="btnReset">Reset</button>
+        </div>
+        <div class="mode" role="group" aria-label="Modo de operación">
+          <button type="button" class="seg" data-cmd="modeAuto" id="segAuto">Automático</button>
+          <button type="button" class="seg" data-cmd="modeManual" id="segManual">Manual</button>
+        </div>
+        <p class="hint" id="modeHint">El modo solo cambia con la máquina detenida.</p>
+        <button type="button" class="estop" id="btnEStop" aria-pressed="false">
+          <span class="estop-cap" aria-hidden="true"></span>
+          <span class="estop-text" id="estopText">Paro de emergencia</span>
+        </button>
+      </section>
+
+      <section class="panel" aria-labelledby="lotTitle">
+        <h2 id="lotTitle" class="panel-title">Lote de producción</h2>
+        <form class="lot" id="lotForm">
+          <label><span class="chip raw c-G"></span>Verdes <input type="number" id="lotGreen" min="0" max="999" value="0" inputmode="numeric"></label>
+          <label><span class="chip raw c-B"></span>Azules <input type="number" id="lotBlue" min="0" max="999" value="0" inputmode="numeric"></label>
+          <button type="submit" class="btn" id="btnLot">Aplicar</button>
+        </form>
+        <p class="hint" id="lotHint">0 y 0 = producción continua. Se aplica con la celda detenida.</p>
+        <div class="lot-progress" id="lotProgress"></div>
+      </section>
+
+      <section class="panel" aria-labelledby="manTitle">
+        <h2 id="manTitle" class="panel-title">Operación manual</h2>
+        <p class="hint" id="manHint">Disponible en modo manual.</p>
+        <div class="manual-groups">
+          <div class="mgroup"><h3 class="sub">Alimentación</h3><div class="manual">
+            <button type="button" class="tog" data-toggle="manE1">E1 emisor verde</button>
+            <button type="button" class="tog" data-toggle="manE2">E2 emisor azul</button>
+            <button type="button" class="tog" data-toggle="manM1">M1 faja 1</button>
+            <button type="button" class="tog" data-toggle="manM2">M2 faja 2</button>
+            <button type="button" class="tog" data-cmd="manPushY01">Ciclo Y01</button>
+            <button type="button" class="tog" data-cmd="manPushY02">Ciclo Y02</button>
+            <button type="button" class="tog wide" data-toggle="manM3">M3 faja principal</button>
+          </div></div>
+          <div class="mgroup"><h3 class="sub">Wheel sorter y mecanizado</h3><div class="manual three">
+            <button type="button" class="tog" data-toggle="manWSPlus">WS1 (+)</button>
+            <button type="button" class="tog" data-toggle="manWSLeft">WS1 Left</button>
+            <button type="button" class="tog" data-toggle="manWSRight">WS1 Right</button>
+          </div><div class="manual">
+            <button type="button" class="tog" data-toggle="manM4">M4 rama tapas</button>
+            <button type="button" class="tog" data-toggle="manM5">M5 rama bases</button>
+            <button type="button" class="tog" data-toggle="manMC1">MC1 marcha</button>
+            <button type="button" class="tog" data-toggle="manMC2">MC2 marcha</button>
+          </div></div>
+          <div class="mgroup"><h3 class="sub">Segregación por color</h3><div class="manual">
+            <button type="button" class="tog" data-toggle="manM6">M6 tapas</button>
+            <button type="button" class="tog" data-toggle="manM8">M8 bases</button>
+            <button type="button" class="tog" data-cmd="manPushY03">Ciclo Y03</button>
+            <button type="button" class="tog" data-cmd="manPushY04">Ciclo Y04</button>
+            <button type="button" class="tog" data-toggle="manM7">M7 tapas verdes</button>
+            <button type="button" class="tog" data-toggle="manM9">M9 bases verdes</button>
+          </div></div>
+        </div>
+        <div class="utility">
+          <button type="button" class="link" data-cmd="clearTracking">Vaciar seguimiento</button>
+          <button type="button" class="link" data-cmd="resetCounters">Reiniciar contadores</button>
+        </div>
+      </section>
+
+      <section class="panel" aria-labelledby="almTitle">
+        <h2 id="almTitle" class="panel-title">Alarmas <span class="count" id="almCount">0</span></h2>
+        <ul class="alarms" id="alarmList"></ul>
+        <h3 class="sub">Historial</h3>
+        <ol class="events" id="eventList"></ol>
+      </section>
+    </aside>
+
+    <!-- ================= Producción ================= -->
+    <section class="panel production" aria-labelledby="kpiTitle">
+      <h2 id="kpiTitle" class="panel-title">Producción</h2>
+      <div class="kpis">
+        <div class="kpi kpi-main"><span class="kpi-v" id="kPpm">0</span><span class="kpi-l">productos por minuto, último minuto</span></div>
+        <div class="kpi"><span class="kpi-v" id="kTotal">0</span><span class="kpi-l">productos terminados</span></div>
+        <div class="kpi products">
+          <span><i class="chip lid c-B"></i><b id="kBlueLids">0</b> tapas azules</span>
+          <span><i class="chip lid c-G"></i><b id="kGreenLids">0</b> tapas verdes</span>
+          <span><i class="chip base c-B"></i><b id="kBlueBases">0</b> bases azules</span>
+          <span><i class="chip base c-G"></i><b id="kGreenBases">0</b> bases verdes</span>
+        </div>
+        <div class="kpi split">
+          <span><b id="kFedGreen">0</b> crudos verdes</span><span><b id="kFedBlue">0</b> crudos azules</span>
+          <span><b id="kWip">0</b> en proceso</span>
+        </div>
+        <div class="kpi"><span class="kpi-v" id="kAvail">—</span><span class="kpi-l">disponibilidad</span></div>
+      </div>
+      <div class="prod-grid">
+        <div>
+          <h3 class="sub">Productos por minuto</h3>
+          <canvas id="chart" height="140" aria-label="Productos por minuto en los últimos dos minutos" role="img"></canvas>
+        </div>
+        <div>
+          <h3 class="sub">Ocupación de los centros de mecanizado</h3>
+          <div class="util"><span>MC1 tapas</span><div class="bar"><i id="uMC1"></i></div><b id="uMC1v">—</b></div>
+          <div class="util"><span>MC2 bases</span><div class="bar"><i id="uMC2"></i></div><b id="uMC2v">—</b></div>
+          <p class="hint" id="bottleneck">El cuello de botella aparece cuando una máquina pasa del 85 %.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= Proceso ================= -->
+    <section class="panel process" aria-labelledby="procTitle">
+      <h2 id="procTitle" class="panel-title">Estado del proceso</h2>
+      <div class="proc-grid">
+        <div class="proc">
+          <h3 class="sub">Unión (Y01 / Y02)</h3>
+          <p><span class="pill" id="pTurn">—</span></p>
+          <p class="mini">En M3: <b id="pMain">0</b> de <span id="pMainCap">5</span></p>
+        </div>
+        <div class="proc">
+          <h3 class="sub">Wheel sorter</h3>
+          <p><span class="pill" id="pSorter">—</span></p>
+          <p class="mini">Verde → <b id="pNextG">tapas</b> · Azul → <b id="pNextB">tapas</b></p>
+        </div>
+        <div class="proc">
+          <h3 class="sub">Rama de tapas (M4)</h3>
+          <div class="queue" id="pQLids"></div>
+          <p class="mini">MC1: <b id="pMC1">—</b></p>
+        </div>
+        <div class="proc">
+          <h3 class="sub">Rama de bases (M5)</h3>
+          <div class="queue" id="pQBases"></div>
+          <p class="mini">MC2: <b id="pMC2">—</b></p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= Señales ================= -->
+    <section class="panel io" aria-labelledby="ioTitle">
+      <h2 id="ioTitle" class="panel-title">Señales del PLC <span class="muted small" id="ioCount"></span></h2>
+      <div class="io-cols">
+        <div><h3 class="sub">Entradas</h3><ul class="io-list" id="ioIn"></ul></div>
+        <div><h3 class="sub">Salidas</h3><ul class="io-list" id="ioOut"></ul></div>
+      </div>
+    </section>
+
+    <section class="panel demo" id="demoPanel" hidden aria-labelledby="demoTitle">
+      <h2 id="demoTitle" class="panel-title">Pruebas de falla y simulación</h2>
+      <p class="hint">Planta simulada. Activa una falla para ver la respuesta de las alarmas; desactívala, retira la pieza si hace falta y pulsa Reset.</p>
+      <div class="speed" role="group" aria-label="Velocidad de simulación">
+        <span>Velocidad</span>
+        <button type="button" class="seg" data-speed="1" aria-pressed="true">×1</button>
+        <button type="button" class="seg" data-speed="2" aria-pressed="false">×2</button>
+        <button type="button" class="seg" data-speed="4" aria-pressed="false">×4</button>
+      </div>
+      <div class="manual four">
+        <button type="button" class="tog" data-fault="y01Stuck">Y01 trabado</button>
+        <button type="button" class="tog" data-fault="y02Stuck">Y02 trabado</button>
+        <button type="button" class="tog" data-fault="y03Stuck">Y03 trabado</button>
+        <button type="button" class="tog" data-fault="y04Stuck">Y04 trabado</button>
+        <button type="button" class="tog" data-fault="mc1Error">MC1 con error</button>
+        <button type="button" class="tog" data-fault="mc2Error">MC2 con error</button>
+        <button type="button" class="tog" data-fault="mc1Door">Puerta MC1</button>
+        <button type="button" class="tog" data-fault="mc2Door">Puerta MC2</button>
+        <button type="button" class="tog" data-fault="jamBlueLids">Atasco S12</button>
+        <button type="button" class="tog" data-fault="jamGreenLids">Atasco S13</button>
+        <button type="button" class="tog" data-fault="jamBlueBases">Atasco S14</button>
+        <button type="button" class="tog" data-fault="jamGreenBases">Atasco S15</button>
+        <button type="button" class="tog wide2" data-fault="unknownPart">Emitir pieza no identificada</button>
+        <button type="button" class="tog wide2" data-cmd="removeSorterPart">Retirar pieza del sorter</button>
+      </div>
+    </section>
+  </main>
+
+  <footer class="foot">
+    Control en CODESYS V3.5 (IEC 61131-3) con planta en Factory I/O, enlazados por Modbus TCP; supervisión por OPC UA. HRFEST 2026.
+  </footer>
+
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>

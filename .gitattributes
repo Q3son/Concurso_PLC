@@ -1,0 +1,5 @@
+* text=auto eol=lf
+*.project binary
+*.factoryio binary
+*.png binary
+*.jpg binary

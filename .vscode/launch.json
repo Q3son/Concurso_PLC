@@ -1,0 +1,39 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Demo: planta simulada (abre http://localhost:3000)",
+      "type": "node",
+      "request": "launch",
+      "cwd": "${workspaceFolder}/hmi",
+      "program": "${workspaceFolder}/hmi/server.js",
+      "args": ["--sim"],
+      "serverReadyAction": { "pattern": "Tablero disponible en (http://localhost:\\d+)", "uriFormat": "%s", "action": "openExternally" }
+    },
+    {
+      "name": "Tablero con PLC real (CODESYS por OPC UA)",
+      "type": "node",
+      "request": "launch",
+      "cwd": "${workspaceFolder}/hmi",
+      "program": "${workspaceFolder}/hmi/server.js",
+      "serverReadyAction": { "pattern": "Tablero disponible en (http://localhost:\\d+)", "uriFormat": "%s", "action": "openExternally" }
+    },
+    {
+      "name": "PLC simulado por OPC UA",
+      "type": "node",
+      "request": "launch",
+      "cwd": "${workspaceFolder}/hmi",
+      "program": "${workspaceFolder}/hmi/src/mock-plc.js"
+    },
+    {
+      "name": "Pruebas automáticas",
+      "type": "node",
+      "request": "launch",
+      "cwd": "${workspaceFolder}/hmi",
+      "runtimeArgs": ["--test", "tests/simulator.test.js", "tests/consistency.test.js"]
+    }
+  ],
+  "compounds": [
+    { "name": "PLC simulado + tablero (prueba OPC UA completa)", "configurations": ["PLC simulado por OPC UA", "Tablero con PLC real (CODESYS por OPC UA)"] }
+  ]
+}

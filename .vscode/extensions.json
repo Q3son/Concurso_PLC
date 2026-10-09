@@ -1,0 +1,9 @@
+{
+  "recommendations": [
+    "serhioromano.vscode-st",
+    "bierner.markdown-mermaid",
+    "github.vscode-pull-request-github",
+    "dbaeumer.vscode-eslint",
+    "vsciot-vscode.vscode-arduino"
+  ]
+}

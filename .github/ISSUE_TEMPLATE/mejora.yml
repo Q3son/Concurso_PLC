@@ -1,0 +1,22 @@
+name: Mejora
+description: Propuesta para sumar puntos en la rúbrica o simplificar la solución
+labels: ["mejora"]
+body:
+  - type: dropdown
+    id: criterio
+    attributes:
+      label: Criterio de evaluación que mejora
+      options: [Funcionalidad y lógica (30 %), Complejidad y HMI (20 %), Calidad del código (20 %), Optimización (15 %), Sustentación (15 %)]
+    validations:
+      required: true
+  - type: textarea
+    id: propuesta
+    attributes:
+      label: Propuesta
+    validations:
+      required: true
+  - type: textarea
+    id: impacto
+    attributes:
+      label: Archivos que cambiarían
+      placeholder: "plc/codesys/04_FB/..., hmi/public/js/control.js, docs/..."

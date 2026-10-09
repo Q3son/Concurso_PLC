@@ -1,0 +1,12 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    { "label": "Instalar dependencias", "type": "shell", "command": "npm install", "options": { "cwd": "${workspaceFolder}/hmi" }, "problemMatcher": [] },
+    { "label": "Demo (planta simulada)", "type": "shell", "command": "npm run demo", "options": { "cwd": "${workspaceFolder}/hmi" }, "isBackground": true, "problemMatcher": [] },
+    { "label": "Tablero con PLC real (OPC UA)", "type": "shell", "command": "npm start", "options": { "cwd": "${workspaceFolder}/hmi" }, "isBackground": true, "problemMatcher": [] },
+    { "label": "PLC simulado por OPC UA", "type": "shell", "command": "npm run mock-plc", "options": { "cwd": "${workspaceFolder}/hmi" }, "isBackground": true, "problemMatcher": [] },
+    { "label": "Pruebas", "type": "shell", "command": "npm test", "options": { "cwd": "${workspaceFolder}/hmi" }, "group": { "kind": "test", "isDefault": true }, "problemMatcher": [] },
+    { "label": "Regenerar plano y mapa de E/S", "type": "shell", "command": "npm run plano && npm run mapa-io", "options": { "cwd": "${workspaceFolder}/hmi" }, "problemMatcher": [] },
+    { "label": "Regenerar imágenes de diagramas", "type": "shell", "command": "npm run diagramas", "options": { "cwd": "${workspaceFolder}/hmi" }, "problemMatcher": [] }
+  ]
+}

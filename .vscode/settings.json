@@ -1,0 +1,10 @@
+{
+  "files.associations": { "*.st": "st", "*.mmd": "mermaid" },
+  "files.eol": "\n",
+  "editor.tabSize": 2,
+  "[st]": { "editor.tabSize": 4, "editor.insertSpaces": true },
+  "files.exclude": { "**/node_modules": true },
+  "search.exclude": { "hmi/public/vendor": true, "**/package-lock.json": true },
+  "markdown.preview.breaks": false,
+  "npm.packageManager": "npm"
+}
