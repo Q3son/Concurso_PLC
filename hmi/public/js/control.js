@@ -11,10 +11,10 @@ import { STATE, PUSHER_STEP, SORTER_STEP, COLOR, BRANCH, ALARMS, colorFromSensor
 // Parámetros (GVL_Param)
 // ---------------------------------------------------------------------
 export const DEFAULT_PARAM = Object.freeze({
-  ALARM_COUNT: 24, FIFO_SIZE: 16, N_FEEDERS: 2, N_LINES: 2, STOP_IS_NC: true, ESTOP_IS_NC: true,
-  tPusherTimeout: 3.0, tTransferTimeout: 4.0, tFeederCenter: 0.4, tDiverterCenter: 0.3,
-  tMergeGap: 1.5, tSorterSettle: 0.3, tSorterTimeout: 6.0, tSorterWait: 30.0, tJam: 5.0,
-  tDrainTimeout: 90.0, tRunOn: 2.0, iMainCapacity: 5, iBranchCapacity: 3,
+  ALARM_COUNT: 25, FIFO_SIZE: 16, N_FEEDERS: 2, N_LINES: 2, STOP_IS_NC: true, ESTOP_IS_NC: true,
+  tPusherTimeout: 3.0, tTransferTimeout: 4.0, tFeederCenter: 0.5, tDiverterCenter: 0.3,
+  tMergeGap: 1.5, tSorterSettle: 0.3, tSorterTimeout: 10.0, tSorterEnter: 2.0, tSorterDeliver: 4.0, tSorterWait: 30.0, tMainLost: 20.0, tBayWait: 25.0, tJam: 5.0,
+  tDrainTimeout: 90.0, tRunOn: 2.0, iMainCapacity: 3, iWipMax: 6, iBranchCapacity: 2,
   xLidsOnLeft: true, xHoldOutOnPush: true, uiLotGreen: 0, uiLotBlue: 0,
 });
 
@@ -169,6 +169,7 @@ export class FB_WheelSorter {
     this.xDone = false; this.xDiscarded = false; this.eDoneColor = COLOR.NONE; this.eDoneBranch = BRANCH.NONE;
     this.eNextBranch = BRANCH.NONE; this.xWaitingBranch = false;
     this.xErrUnknown = false; this.xErrTimeout = false;
+    this.tonLeft = new TON(); this.tpQuiet = new TP();
   }
   call(a, dt) {
     const S = SORTER_STEP;
@@ -187,13 +188,14 @@ export class FB_WheelSorter {
     this.tonStep.call(a.xEnable && this.eStep === this.eStepPrev && (this.eStep === S.PREPARE || this.eStep === S.TRANSFER),
       this.eStep === S.PREPARE ? a.tSettle : a.tTimeout, dt);
     this.eStepPrev = this.eStep;
+    this.tonLeft.call(this.eStep === S.TRANSFER && this.xLeftRead, a.tDeliver, dt);
 
     if (a.xManualMode) {
       if (this.eStep !== S.ERROR) this.eStep = S.IDLE;
     } else if (a.xEnable) {
       switch (this.eStep) {
         case S.IDLE:
-          if (this.rtPresence.Q && a.xAutoMode) { this.xErrUnknown = true; this.eStep = S.ERROR; }
+          if (this.rtPresence.Q && a.xAutoMode && !this.tpQuiet.Q) { this.xErrUnknown = true; this.eStep = S.ERROR; }
           else if (xPartAtRead && a.xAutoMode) {
             if ((this.eNextBranch === BRANCH.LIDS && a.xLidsFree) || (this.eNextBranch === BRANCH.BASES && a.xBasesFree)) {
               this.eColor = a.eColorAtRead; this.eBranch = this.eNextBranch;
@@ -207,7 +209,7 @@ export class FB_WheelSorter {
         case S.TRANSFER:
           if (this.ftRead.Q) this.xLeftRead = true;
           if (this.rtPresence.Q) this.xSeenOnSorter = true;
-          if (this.xSeenOnSorter && this.ftPresence.Q) this.eStep = S.DONE;
+          if ((this.xSeenOnSorter && this.ftPresence.Q) || this.tonLeft.Q) this.eStep = S.DONE;
           else if (this.tonStep.Q) { this.xErrTimeout = true; this.eStep = S.ERROR; }
           break;
         case S.DONE:
@@ -232,10 +234,11 @@ export class FB_WheelSorter {
     } else {
       this.xPlus = xMoving; this.xLeft = xMoving && xToLeft; this.xRight = xMoving && !xToLeft;
       if (this.eStep === S.PREPARE || this.eStep === S.ERROR) this.xHoldMain = true;
-      else if (this.eStep === S.TRANSFER) this.xHoldMain = this.xSeenOnSorter && this.xLeftRead && xPartAtRead;
+      else if (this.eStep === S.TRANSFER) this.xHoldMain = this.xLeftRead && xPartAtRead && (this.xSeenOnSorter || this.tonLeft.ET >= a.tEnter);
       else this.xHoldMain = xPartAtRead;
     }
     this.xWaitingBranch = a.xAutoMode && this.eStep === S.IDLE && xPartAtRead;
+    this.tpQuiet.call(this.xDone, a.tDeliver, dt);
   }
 }
 
@@ -385,10 +388,10 @@ export class Controller {
     this.hmi = newHmi();
     this.eState = STATE.IDLE; this.xFirstScan = true; this.xModeAuto = true;
     this.rtBtnStart = new R_TRIG(); this.rtBtnStop = new R_TRIG(); this.rtBtnReset = new R_TRIG(); this.rtSelAuto = new R_TRIG();
-    this.xSelAutoPrev = false; this.tpReset = new TP();
+    this.xSelAutoPrev = false; this.xSelPendAuto = false; this.xSelPendMan = false; this.tpReset = new TP();
     this.xLotCompleted = false; this.audiLotFed = [null, 0, 0]; this.audiFed = [null, 0, 0];
     this.afbFeed = [null, new FB_FeederStation(), new FB_FeederStation()];
-    this.axAwaitDrop = [null, false, false]; this.atonAwait = [null, new TON(), new TON()];
+    this.axAwaitDrop = [null, false, false]; this.atonAwait = [null, new TON(), new TON()]; this.atonDoor = [null, new TON(), new TON()];
     this.iTurn = 1; this.xGapReq = false; this.tonGap = new TON(); this.rtS5 = new R_TRIG();
     this.iOnMain = 0; this.fbM3 = new FB_Conveyor(); this.fbSorter = new FB_WheelSorter(); this.tonSorterWait = new TON();
     this.aBranch = [null, new Fifo(this.P.FIFO_SIZE), new Fifo(this.P.FIFO_SIZE)];
@@ -401,7 +404,7 @@ export class Controller {
     this.afbGreen = [null, new FB_Conveyor(), new FB_Conveyor()];
     this.artExitBlue = [null, new R_TRIG(), new R_TRIG()]; this.artExitGreen = [null, new R_TRIG(), new R_TRIG()];
     this.atonJamBlue = [null, new TON(), new TON()]; this.atonJamGreen = [null, new TON(), new TON()];
-    this.xEvtStartBlocked = false; this.xEvtQueueFull = false;
+    this.xEvtStartBlocked = false; this.xEvtQueueFull = false; this.xEvtMainLost = false; this.tonMainLost = new TON(); this.atonBranchLost = [null, new TON(), new TON()]; this.axBayWait = [null, false, false]; this.aftEntry = [null, new F_TRIG(), new F_TRIG()]; this.artMcBusy = [null, new R_TRIG(), new R_TRIG()]; this.atonBayWait = [null, new TON(), new TON()]; this.axBranchLost = [null, false, false];
     this.fbAlarm = new FB_AlarmManager(this.P.ALARM_COUNT); this.fbKpi = new FB_Kpi();
     this.tonDrain = new TON(); this.tonBlink = new TON(); this.xBlink = false;
     this.heartbeat = 0; this.lastColor = COLOR.NONE;
@@ -423,8 +426,11 @@ export class Controller {
     const xStartReq = this.rtBtnStart.Q || H.cmdStart;
     const xStopReq = this.rtBtnStop.Q || H.cmdStop;
     const xResetReq = this.rtBtnReset.Q || H.cmdReset;
-    const xModeAutoReq = this.rtSelAuto.Q || H.cmdModeAuto;
-    const xModeManualReq = (this.xSelAutoPrev && !I.selAuto) || H.cmdModeManual;
+    // El giro del selector queda pendiente hasta que la celda esté detenida (IDLE o MANUAL)
+    if (this.rtSelAuto.Q) { this.xSelPendAuto = true; this.xSelPendMan = false; }
+    else if (this.xSelAutoPrev && !I.selAuto) { this.xSelPendMan = true; this.xSelPendAuto = false; }
+    const xModeAutoReq = this.xSelPendAuto || H.cmdModeAuto;
+    const xModeManualReq = this.xSelPendMan || H.cmdModeManual;
     this.xSelAutoPrev = I.selAuto;
     let xClearTracking = H.cmdClearTracking;
     const xResetCounters = H.cmdResetCounters;
@@ -436,6 +442,7 @@ export class Controller {
     let axManFeedBelt = [null, H.manM1, H.manM2], axManFeedPush = [null, H.manPushY01, H.manPushY02], axManEmit = [null, H.manE1, H.manE2];
     const axEntry = [null, I.sLidsEntry, I.sBasesEntry];
     const axMcBusy = [null, I.mc1Busy, I.mc2Busy], axMcError = [null, I.mc1Error, I.mc2Error], axMcOpened = [null, I.mc1Opened, I.mc2Opened];
+    const aiMcProgress = [null, I.mc1Progress, I.mc2Progress];
     const axGreenVision = [null, I.sGreenLid, I.sGreenBase];
     const axDivFront = [null, I.y03Front, I.y04Front], axDivBack = [null, I.y03Back, I.y04Back];
     const axExitBlue = [null, I.sBlueLids, I.sBlueBases], axExitGreen = [null, I.sGreenLids, I.sGreenBases];
@@ -444,7 +451,7 @@ export class Controller {
 
     // 2. Modo y lote
     if (this.eState === S.IDLE || this.eState === S.MANUAL) {
-      if (xModeAutoReq) this.xModeAuto = true; else if (xModeManualReq) this.xModeAuto = false;
+      if (xModeAutoReq) this.xModeAuto = true; else if (xModeManualReq) this.xModeAuto = false; this.xSelPendAuto = false; this.xSelPendMan = false;
       if (H.cmdApplyLot) {
         P.uiLotGreen = H.setLotGreen | 0; P.uiLotBlue = H.setLotBlue | 0;
         this.audiLotFed[1] = 0; this.audiLotFed[2] = 0; this.xLotCompleted = false;
@@ -462,15 +469,17 @@ export class Controller {
     for (let k = 1; k <= 2; k++) {
       setA(2 * k, this.afbFeed[k].xErrExtend); setA(2 * k + 1, this.afbFeed[k].xErrRetract);
       setA(4 + 2 * k, this.afbDiv[k].xErrExtend); setA(5 + 2 * k, this.afbDiv[k].xErrRetract);
-      setA(12 + k, axMcError[k]); setA(14 + k, axMcOpened[k]);
+      // Puerta: solo es falla si se abre con el mecanizado en curso (avance 1..99 %) más de 1 s
+      this.atonDoor[k].call(axMcOpened[k] && aiMcProgress[k] > 0 && aiMcProgress[k] < 100, 1, dt);
+      setA(12 + k, axMcError[k]); setA(14 + k, this.atonDoor[k].Q);
       setA(15 + 2 * k, this.atonJamBlue[k].Q); setA(16 + 2 * k, this.atonJamGreen[k].Q);
     }
     setA(10, this.atonAwait[1].Q || this.atonAwait[2].Q);
     setA(11, this.fbSorter.xErrUnknown); setA(12, this.fbSorter.xErrTimeout);
-    setA(21, this.xEvtStartBlocked); setA(22, this.tonSorterWait.Q); setA(23, this.xEvtQueueFull);
+    setA(21, this.xEvtStartBlocked); setA(22, this.tonSorterWait.Q); setA(23, this.xEvtQueueFull); setA(25, this.xEvtMainLost);
     setA(24, !I.fioRunning);
     this.fbAlarm.call(reset);
-    this.xEvtStartBlocked = false; this.xEvtQueueFull = false;
+    this.xEvtMainLost = false; this.xEvtStartBlocked = false; this.xEvtQueueFull = false;
 
     // 4. Máquina de estados
     if (xEStopActive) this.eState = S.EMERGENCY;
@@ -540,7 +549,12 @@ export class Controller {
     }
     if (this.tonGap.call(this.xGapReq && this.fbM3.xMotor, P.tMergeGap, dt)) this.xGapReq = false;
 
-    let xMergeFree = xAutoRun && !I.sMainDrop && !this.xGapReq && this.iOnMain < P.iMainCapacity;
+    // Contención: con una rama llena no se empuja ni se emite hasta que el robot libere la bahía
+    let iWip = this.iOnMain + this.aBranch[1].iCount + this.aBranch[2].iCount;
+    for (let k = 1; k <= 2; k++) iWip += (this.aeMcColor[k] !== COLOR.NONE ? 1 : 0) + (this.axAwaitDrop[k] ? 1 : 0);
+    // Límite de trabajo en proceso: un crudo nuevo entra cuando una máquina termina otro
+    const xBaysFull = this.aBranch[1].iCount >= P.iBranchCapacity || this.aBranch[2].iCount >= P.iBranchCapacity || iWip >= P.iWipMax;
+    let xMergeFree = xAutoRun && !I.sMainDrop && !this.xGapReq && !xBaysFull && this.iOnMain < P.iMainCapacity;
     for (let k = 1; k <= 2; k++) xMergeFree = xMergeFree && !this.afbFeed[k].xBusy && !this.axAwaitDrop[k];
     const axEmit = [null, false, false];
     for (let k = 1; k <= 2; k++) {
@@ -554,8 +568,8 @@ export class Controller {
       }, dt);
       if (F.xPushStart) { xMergeFree = false; this.iTurn = j; this.axAwaitDrop[k] = true; this.audiLotFed[k]++; }
       if (reset) this.axAwaitDrop[k] = false;
-      this.atonAwait[k].call(this.axAwaitDrop[k] && xEnable, P.tTransferTimeout, dt);
-      axEmit[k] = xEnable && ((xAutoRun && axAllow[k] && F.xBelt) || (xManualMode && axManEmit[k]));
+      this.atonAwait[k].call(this.axAwaitDrop[k] && xEnable && this.fbM3.xMotor, P.tTransferTimeout, dt);
+      axEmit[k] = xEnable && ((xAutoRun && axAllow[k] && !xBaysFull && F.xBelt) || (xManualMode && axManEmit[k]));
     }
     H.manPushY01 = false; H.manPushY02 = false;
 
@@ -566,7 +580,7 @@ export class Controller {
       xEnable, xAutoMode: xAutoActive, xManualMode, xManPlus: H.manWSPlus, xManLeft: H.manWSLeft, xManRight: H.manWSRight,
       eColorAtRead: eColorRead, xPresence: I.sSorter,
       xLidsFree: this.aBranch[1].iCount < P.iBranchCapacity, xBasesFree: this.aBranch[2].iCount < P.iBranchCapacity,
-      xLidsOnLeft: P.xLidsOnLeft, tSettle: P.tSorterSettle, tTimeout: P.tSorterTimeout, xReset: reset,
+      xLidsOnLeft: P.xLidsOnLeft, tSettle: P.tSorterSettle, tTimeout: P.tSorterTimeout, tEnter: P.tSorterEnter, tDeliver: P.tSorterDeliver, xReset: reset,
       xResetRule: xClearTracking && !xAutoActive,
     }, dt);
     if (W.xDone) {
@@ -577,16 +591,29 @@ export class Controller {
     if (W.xDiscarded) this.iOnMain = Math.max(this.iOnMain - 1, 0);
     this.tonSorterWait.call(W.xWaitingBranch, P.tSorterWait, dt);
     this.fbM3.call({
-      xEnable, xManualMode, xAutoMode: xAutoActive, xDemand: this.iOnMain > 0 || eColorRead !== COLOR.NONE,
+      xEnable, xManualMode, xAutoMode: xAutoActive, xDemand: this.iOnMain > 0 || eColorRead !== COLOR.NONE || this.axAwaitDrop[1] || this.axAwaitDrop[2],
       xHold: W.xHoldMain, xManualRun: H.manM3, tRunOn: P.tRunOn,
     }, dt);
+    // Piezas perdidas en M3: se corrige la cuenta y se avisa (alarma 25)
+    this.tonMainLost.call(xAutoActive && this.fbM3.xMotor && this.iOnMain > 0 && eColorRead === COLOR.NONE
+      && W.eStep === SORTER_STEP.IDLE && !I.sSorter, P.tMainLost, dt);
+    if (this.tonMainLost.Q) { this.iOnMain = 0; this.xEvtMainLost = true; }
 
     // 8. Zonas 3 y 4
     for (let k = 1; k <= 2; k++) {
+      // Una sola pieza en la bahía: tras pasar S8/S9 la faja espera a que el robot la tome
+      this.aftEntry[k].call(axEntry[k]); this.artMcBusy[k].call(axMcBusy[k]);
+      if (this.aftEntry[k].Q && xAutoActive) this.axBayWait[k] = true;
+      this.atonBayWait[k].call(this.axBayWait[k], P.tBayWait, dt);
+      if (this.artMcBusy[k].Q || this.atonBayWait[k].Q || !xAutoActive) this.axBayWait[k] = false;
       this.afbBranch[k].call({
-        xEnable, xManualMode, xAutoMode: xAutoActive, xDemand: this.aBranch[k].iCount > 0, xHold: axEntry[k] && this.aBranch[k].iCount <= 1,
+        xEnable, xManualMode, xAutoMode: xAutoActive, xDemand: this.aBranch[k].iCount > 0, xHold: axEntry[k] || this.axBayWait[k],
         xManualRun: axManBranch[k], tRunOn: P.tRunOn,
       }, dt);
+      // Piezas perdidas o atascadas en la rama: aviso (alarma 25); la cola se vacía con Reset
+      this.atonBranchLost[k].call(xAutoActive && this.afbBranch[k].xMotor && this.aBranch[k].iCount > 0 && !axEntry[k], P.tMainLost, dt);
+      if (this.atonBranchLost[k].Q) { this.axBranchLost[k] = true; this.xEvtMainLost = true; }
+      if (this.axBranchLost[k] && reset) { this.aBranch[k].clear(); this.axBranchLost[k] = false; }
       const M = this.afbMC[k];
       M.call({
         xEnable, xRun: xAutoActive, xManualMode, xManRun: axManMC[k], xProduceLids: k === 1,
@@ -604,7 +631,7 @@ export class Controller {
       if (D.xDiverted) { this.aiOnOut[k] = Math.max(this.aiOnOut[k] - 1, 0); this.aiOnGreen[k]++; }
 
       this.afbOut[k].call({
-        xEnable, xManualMode, xAutoMode: xAutoActive, xDemand: this.aiOnOut[k] > 0, xHold: D.xHoldBelt,
+        xEnable, xManualMode, xAutoMode: xAutoActive, xDemand: this.aiOnOut[k] > 0 || this.aeMcColor[k] !== COLOR.NONE, xHold: D.xHoldBelt,
         xManualRun: axManOut[k], tRunOn: P.tRunOn,
       }, dt);
       this.afbGreen[k].call({

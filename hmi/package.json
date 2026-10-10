@@ -18,6 +18,7 @@
     "plano": "node ../tools/generar-plano.mjs",
     "diagramas": "node ../tools/render-diagramas.mjs",
     "mapa-io": "node ../tools/generar-mapa-io.mjs",
+    "escena": "node ../tools/generar-escena-fio.mjs",
     "check": "node --check server.js && npm test"
   },
   "dependencies": {

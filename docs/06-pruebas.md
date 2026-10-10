@@ -32,7 +32,7 @@ npm test
 | Robustez | 8 combinaciones de parámetros y ritmos de emisión extremos, 5 min cada una, sin bloqueos | Funcionalidad |
 
 En la demo del tablero, el panel *Pruebas de falla* provoca las mismas fallas a mano. Ejemplo:
-puerta de MC1 abierta → alarma 15, estado FAULT, MC1 en rojo y botón Reset resaltado.
+puerta de MC1 abierta durante el mecanizado → alarma 15, estado FAULT, MC1 en rojo y botón Reset resaltado.
 
 ![Respuesta del tablero a una falla](img/hmi-falla.png)
 
@@ -63,7 +63,7 @@ Marca cada prueba antes de grabar el video.
 | P12 | Bloquear Y01 con una caja | Alarma 2 tras 3 s, FAULT | ☐ |
 | P13 | Retirar a mano una pieza recién empujada | Alarma 10 (S5 no confirma) | ☐ |
 | P14 | Poner una pieza de metal en M3 | Alarma 11 en el sorter | ☐ |
-| P15 | Abrir la puerta de MC1 | Alarma 15 | ☐ |
+| P15 | Abrir la puerta de MC1 con una pieza en mecanizado | Alarma 15 | ☐ |
 | P16 | Quitar el removedor R4 | Alarma 20 (atasco en S15) tras 5 s | ☐ |
 | P17 | Selector Manual: mover cada faja, el sorter y cada pusher desde el tablero | Cada actuador responde; en Auto no responden | ☐ |
 | P18 | Pausar Factory I/O | Aviso 24 en el tablero | ☐ |

@@ -6,6 +6,8 @@
                 Si no hay cupo, M3 se retiene con la pieza en lectura (acumulacion).
      PREPARE  : ruedas elevadas y orientadas (Left/Right). M3 espera tSettle.
      TRANSFER : M3 avanza; la pieza pasa por S7 (flanco de subida y bajada) -> DONE.
+                Si S7 no la ve (la pieza se desvia antes de cruzar el haz), se da por entregada
+                tDeliver despues de salir del punto de lectura.
      DONE     : alterna la regla para ese color y avisa a PLC_PRG (xDone).
      ERROR    : pieza en S7 sin clasificar (no es crudo verde ni azul) o tiempo excedido. Reset. *)
 FUNCTION_BLOCK FB_WheelSorter
@@ -22,7 +24,9 @@ VAR_INPUT
     xBasesFree    : BOOL;           (* Cupo en la rama de bases *)
     xLidsOnLeft   : BOOL := TRUE;
     tSettle       : TIME := T#300MS;
-    tTimeout      : TIME := T#6S;
+    tTimeout      : TIME := T#10S;
+    tEnter        : TIME := T#2S;     (* Salir de la lectura -> pieza ya sobre el sorter *)
+    tDeliver      : TIME := T#4S;     (* Salir de la lectura -> pieza ya en su rama *)
     xReset        : BOOL;
     xResetRule    : BOOL;           (* Reinicia la alternancia: el proximo de cada color va a tapas *)
 END_VAR
@@ -55,6 +59,8 @@ VAR
     xLeftRead     : BOOL;           (* La pieza en curso ya salio del punto de lectura *)
     xToLeft       : BOOL;
     xMoving       : BOOL;
+    tonLeft       : TON;            (* Tiempo desde que la pieza en curso salio de la lectura *)
+    tpQuiet       : TP;             (* Tras entregar, S7 puede ver aun la pieza saliendo *)
 END_VAR
 
 xDone       := FALSE;
@@ -84,6 +90,7 @@ tonStep(IN := xEnable AND (eStep = eStepPrev)
               AND ((eStep = E_SorterStep.PREPARE) OR (eStep = E_SorterStep.TRANSFER)),
         PT := SEL(eStep = E_SorterStep.PREPARE, tTimeout, tSettle));
 eStepPrev := eStep;
+tonLeft(IN := (eStep = E_SorterStep.TRANSFER) AND xLeftRead, PT := tDeliver);
 
 IF xManualMode THEN
     (* En manual el operador mueve el sorter; el seguimiento se vacia al volver a automatico *)
@@ -93,7 +100,7 @@ IF xManualMode THEN
 ELSIF xEnable THEN
     CASE eStep OF
         E_SorterStep.IDLE:
-            IF rtPresence.Q AND xAutoMode THEN
+            IF rtPresence.Q AND xAutoMode AND NOT tpQuiet.Q THEN
                 xErrUnknown := TRUE;                     (* Llego al sorter sin pasar por la vision *)
                 eStep := E_SorterStep.ERROR;
             ELSIF xPartAtRead AND xAutoMode THEN
@@ -119,7 +126,7 @@ ELSIF xEnable THEN
             IF rtPresence.Q THEN
                 xSeenOnSorter := TRUE;
             END_IF
-            IF xSeenOnSorter AND ftPresence.Q THEN
+            IF (xSeenOnSorter AND ftPresence.Q) OR tonLeft.Q THEN
                 eStep := E_SorterStep.DONE;
             ELSIF tonStep.Q THEN
                 xErrTimeout := TRUE;
@@ -168,10 +175,11 @@ ELSE
         E_SorterStep.TRANSFER:
             (* La siguiente pieza espera en lectura, pero solo cuando la pieza en curso ya esta
                sobre el sorter: antes, M3 debe seguir moviendose para entregarla *)
-            xHoldMain := xSeenOnSorter AND xLeftRead AND xPartAtRead;
+            xHoldMain := xLeftRead AND xPartAtRead AND (xSeenOnSorter OR (tonLeft.ET >= tEnter));
     ELSE
         xHoldMain := xPartAtRead;                      (* IDLE / DONE: esperar decision *)
     END_CASE
 END_IF
 
 xWaitingBranch := xAutoMode AND (eStep = E_SorterStep.IDLE) AND xPartAtRead;
+tpQuiet(IN := xDone, PT := tDeliver);

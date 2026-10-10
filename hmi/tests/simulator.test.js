@@ -151,11 +151,16 @@ test('pieza no identificada (ni verde ni azul) detiene el sorter con alarma 11',
   assert.equal(s.plant.sortingErrors, 0);
 });
 
-test('error y puerta abierta del centro de mecanizado generan falla', () => {
+test('puerta abierta durante el mecanizado y error del centro de mecanizado generan falla', () => {
   const s = started();
-  s.run(20);
+  // La puerta abierta sin mecanizar no es falla (en la escena la reja queda abierta)
   s.command('mc2Door', true);
-  s.run(0.5);
+  s.run(1.5);
+  assert.equal(s.snapshot().state, STATE.AUTO_RUN, 'puerta abierta sin pieza en proceso: sigue produciendo');
+  s.command('mc2Door', false);
+  for (let t = 0; t < 120 && !(s.inputs.mc2Progress > 0 && s.inputs.mc2Progress < 60); t += 0.1) s.run(0.1);
+  s.command('mc2Door', true);
+  s.run(1.5);
   let n = s.snapshot();
   assert.equal(n.state, STATE.FAULT);
   assert.ok(maskHas(n.alarms.active, 16));
@@ -234,4 +239,62 @@ test('robustez: sin bloqueos ni errores con parámetros y ritmos de emisión ext
       assert.ok(n.kpi.total >= 20, `${tag}: ${n.kpi.total} productos`);
     }
   }
+});
+
+test('el selector girado durante una emergencia se aplica al rearmar (no se pierde)', () => {
+  const s = new FactorySim({ seed: 7 });
+  s.plant.panel.selAuto = false;          // arranca con el selector en Manual
+  s.command('estop', true);
+  s.run(0.5);
+  assert.equal(s.snapshot().state, STATE.EMERGENCY);
+  s.plant.panel.selAuto = true;           // el operador gira a Auto con la emergencia activa
+  s.run(0.3);
+  s.command('estop', false);
+  s.command('reset');
+  s.run(0.5);
+  assert.equal(s.snapshot().state, STATE.IDLE, 'queda en IDLE (automático), no en MANUAL');
+  s.command('start');
+  s.run(1);
+  assert.equal(s.snapshot().state, STATE.AUTO_RUN);
+});
+
+test('piezas perdidas en M3: el seguimiento se corrige solo y la unión no queda bloqueada', () => {
+  const s = started();
+  s.plc.iOnMain = 5;                      // 5 piezas "fantasma" (cayeron de la faja): M3 llena en la cuenta
+  s.run(10);
+  const fed = s.plc.audiFed[1] + s.plc.audiFed[2];
+  assert.equal(fed, 0, 'con M3 llena en la cuenta no se empuja');
+  s.run(30);
+  const n = s.snapshot();
+  assert.ok(maskHas(n.alarms.active, 25) || maskHas(n.alarms.unack, 25), 'aviso de piezas perdidas');
+  assert.equal(n.state, STATE.AUTO_RUN, 'es un aviso: la celda sigue produciendo');
+  assert.ok(s.plc.audiFed[1] + s.plc.audiFed[2] > fed, 'la unión vuelve a alimentar');
+});
+
+test('S7 no ve la pieza desviada: el sorter la entrega por tiempo, sin falla ni errores de segregación', () => {
+  const s = started();
+  const step = s.plant.step.bind(s.plant);
+  s.plant.step = (o, h) => ({ ...step(o, h), sSorter: false });   // como en Factory I/O: la pieza gira antes del haz
+  s.run(180);
+  const n = s.snapshot();
+  assert.equal(n.state, STATE.AUTO_RUN);
+  assert.equal(n.alarms.active & ~(1 << 21), 0, 'sin alarmas activas (salvo aviso de cuello de botella)');
+  assert.ok(n.kpi.total > 15, `produce (${n.kpi.total})`);
+  assert.equal(s.plant.sortingErrors, 0);
+});
+
+test('piezas perdidas en una rama: aviso, la cola se conserva y se vacía con Reset', () => {
+  const s = started();
+  s.run(5);
+  for (let i = 0; i < 3; i++) s.plc.aBranch[1].push(1);   // 3 tapas "fantasma" (cayeron del sorter)
+  s.run(30);
+  let n = s.snapshot();
+  assert.equal(n.state, STATE.AUTO_RUN);
+  assert.ok(maskHas(n.alarms.active, 25) || maskHas(n.alarms.unack, 25), 'aviso de piezas perdidas');
+  assert.ok(s.plc.aBranch[1].iCount >= 2, 'la cola se conserva: el sorter no apila piezas encima');
+  s.command('reset');
+  s.run(30);
+  n = s.snapshot();
+  assert.ok(s.plc.aBranch[1].iCount < 3, 'tras Reset la rama de tapas vuelve a recibir piezas');
+  assert.equal(s.plant.sortingErrors, 0);
 });

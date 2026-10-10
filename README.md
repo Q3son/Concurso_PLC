@@ -30,7 +30,7 @@ por color, máquinas de tapas/bases, segregación y conteo) está trazada a su c
 | ----------------------- | ---- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
 | Funcionalidad y lógica | 30 % | Máquina de estados, unión con turno y confirmación, regla del sorter verificada pieza por pieza, lote X/Y, 24 alarmas con causa y solución |
 | Complejidad y HMI       | 20 % | 34 entradas, 32 salidas, 3 registros; wheel sorter y centros de mecanizado; tablero ISA-101 con gemelo 3D                                      |
-| Calidad del código     | 20 % | IEC 61131-3 en ST: 8 FB reutilizables en arreglos, enums estrictos, GVL por función, sin números mágicos; 18 pruebas automáticas en CI     |
+| Calidad del código     | 20 % | IEC 61131-3 en ST: 8 FB reutilizables en arreglos, enums estrictos, GVL por función, sin números mágicos; 22 pruebas automáticas en CI     |
 | Optimización           | 15 % | **14,2 productos/min = 99 % del máximo teórico** que impone MC1; fajas por demanda ([análisis](docs/09-optimizacion.md))               |
 | Sustentación           | 15 % | [Guion de 5 minutos](docs/05-video-y-final.md) y [protocolo de pruebas](docs/06-pruebas.md)                                                      |
 
@@ -130,7 +130,7 @@ smart-factory-challenge/
 cd hmi && npm test
 ```
 
-18 pruebas: la secuencia completa, la regla del wheel sorter pieza por pieza, la unión, el lote,
+22 pruebas: la secuencia completa, la regla del wheel sorter pieza por pieza, la unión, el lote,
 parada controlada, emergencia, fallas, modo manual, robustez frente a parámetros extremos y la
 **coherencia entre los archivos `.st` y el tablero** (nombres, direcciones Modbus, parámetros y
 alarmas). Se ejecutan en GitHub Actions en cada push y en cada *pull request*.

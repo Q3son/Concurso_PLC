@@ -1,7 +1,7 @@
 # Escena de Factory I/O
 
-Guarda aquí la escena como `SmartFactory_TapasBases.factoryio` (menú *File > Save As*).
+`SmartFactory_TapasBases.factoryio` es la celda completa con las 69 señales ya mapeadas al driver
+Modbus TCP/IP Client. Ábrela con Factory I/O 2.5 y sigue [docs/03-escena-factoryio.md](../docs/03-escena-factoryio.md).
 
-Cómo construirla, pieza por pieza, con posiciones, configuración de los sensores de visión, los
-centros de mecanizado y el driver Modbus: [docs/03-escena-factoryio.md](../docs/03-escena-factoryio.md).
-Versionar la escena permite que el jurado y el equipo la abran exactamente igual.
+Se genera con `cd hmi && npm run escena` ([tools/generar-escena-fio.mjs](../tools/generar-escena-fio.mjs)).
+`ref/` guarda las escenas de Factory I/O 2.5.10 usadas como plantilla (no las edites).

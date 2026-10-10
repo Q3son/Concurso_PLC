@@ -1,4 +1,29 @@
-# 3. Construir la escena en Factory I/O
+# 3. Escena de Factory I/O
+
+## 3.0 Escena lista (recomendado)
+
+La escena oficial es [`factoryio/SmartFactory_TapasBases.factoryio`](../factoryio/SmartFactory_TapasBases.factoryio),
+probada con CODESYS Control Win y Factory I/O 2.5.10: la celda completa con sus **69 señales ya
+asignadas** al driver Modbus TCP/IP Client en el mismo orden que `GVL_IO`.
+
+1. Ábrela en Factory I/O (doble clic o *File > Open*).
+2. **F4** → **Modbus TCP/IP Client**: Host `127.0.0.1`, Port `502`, Slave ID `1` → **Connect**.
+3. **Play** → selector en **1** → **Reset** → **Start**.
+
+Partió de una escena generada por código ([`tools/generar-escena-fio.mjs`](../tools/generar-escena-fio.mjs),
+`cd hmi && npm run escena`, que escribe `SmartFactory_TapasBases_generada.factoryio` sin tocar la oficial)
+y se ajustó a mano en Factory I/O:
+
+| Ajuste | Por qué |
+|---|---|
+| Guías de ruedas (*Wheel Aligner*) en M3, antes del sorter | Centran la pieza para que S6.1/S6.2 la lean y entre recta al sorter |
+| Guías de ruedas dobles al final de M4 y M5 | Encauzan la pieza hasta la bahía del robot (sin ellas chocaba con el marco) |
+| Wheel sorter al ras de las fajas | La pieza no se traba al entrar ni al salir |
+| Removedores sobre el final de M6 a M9 | Las fajas terminan contra la reja: el producto debe retirarse sobre la cinta |
+
+Las guías son piezas pasivas (sin señales): no cuentan como sensores ni actuadores.
+
+## Construirla a mano (alternativa)
 
 Tiempo estimado: 90 a 120 minutos la primera vez. Sigue el [plano de distribución](img/plano-celda.png)
 (1 cuadro = 1 m). Nombra cada elemento con su código para que el mapeo sea directo, por ejemplo
@@ -54,7 +79,7 @@ Según la documentación de Factory I/O, el *Machining Center* tiene las salidas
 - El PLC mantiene **Start** en TRUE mientras la celda está en automático y manda **Stop** ante
   emergencia o falla. **Reset** se envía con el botón Reset.
 - Si llega una pieza inválida a la bahía, la máquina activa *Has Error* (alarmas 13 y 14).
-- Si se abre la puerta de seguridad, *Opened* genera las alarmas 15 y 16.
+- *Opened* es la puerta de la reja. En la escena queda abierta y el robot trabaja igual; solo genera las alarmas 15 y 16 si se abre con el mecanizado en curso (avance 1 a 99 %) más de 1 s.
 
 > Verifica en tu versión que *Is Busy* baje cuando el producto ya está en la bahía de salida. Si
 > baja antes (al terminar el CNC, sin esperar al robot), no cambia nada: el producto igual llega a

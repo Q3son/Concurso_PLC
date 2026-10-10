@@ -38,6 +38,8 @@ VAR
     rtBtnReset       : R_TRIG;
     rtSelAuto        : R_TRIG;
     xSelAutoPrev     : BOOL;
+    xSelPendAuto     : BOOL;          (* Selector girado a Auto: se aplica al quedar detenida la celda *)
+    xSelPendMan      : BOOL;          (* Selector girado a Manual: idem *)
     tpReset          : TP;            (* Estira el pulso de Reset a 200 ms *)
 
     (* --- Permisivos --- *)
@@ -65,6 +67,8 @@ VAR
     axManFeedPush    : ARRAY[1..GVL_Param.N_FEEDERS] OF BOOL;
     axManEmit        : ARRAY[1..GVL_Param.N_FEEDERS] OF BOOL;
     axEmit           : ARRAY[1..GVL_Param.N_FEEDERS] OF BOOL;
+    xBaysFull        : BOOL;          (* Una rama tiene iBranchCapacity piezas: se deja de alimentar *)
+    iWip             : INT;           (* Crudos en proceso: en camino a M3, en M3, en las ramas y en las maquinas *)
     axPermit         : ARRAY[1..GVL_Param.N_FEEDERS] OF BOOL;
     axAwaitDrop      : ARRAY[1..GVL_Param.N_FEEDERS] OF BOOL;    (* Empujo y espera ver la pieza en S5 *)
     atonAwait        : ARRAY[1..GVL_Param.N_FEEDERS] OF TON;
@@ -95,6 +99,8 @@ VAR
     axMcBusy         : ARRAY[1..GVL_Param.N_LINES] OF BOOL;
     axMcError        : ARRAY[1..GVL_Param.N_LINES] OF BOOL;
     axMcOpened       : ARRAY[1..GVL_Param.N_LINES] OF BOOL;
+    aiMcProgress     : ARRAY[1..GVL_Param.N_LINES] OF INT;
+    atonDoor         : ARRAY[1..GVL_Param.N_LINES] OF TON;   (* Puerta abierta con el mecanizado en curso *)
     axGreenVision    : ARRAY[1..GVL_Param.N_LINES] OF BOOL;
     axDivFront       : ARRAY[1..GVL_Param.N_LINES] OF BOOL;
     axDivBack        : ARRAY[1..GVL_Param.N_LINES] OF BOOL;
@@ -114,6 +120,14 @@ VAR
     (* --- Eventos (pulsos) que alimentan alarmas en el ciclo siguiente --- *)
     xEvtStartBlocked : BOOL;
     xEvtQueueFull    : BOOL;
+    xEvtMainLost     : BOOL;
+    tonMainLost      : TON;
+    atonBranchLost   : ARRAY[1..GVL_Param.N_LINES] OF TON;   (* Rama con piezas contadas que nunca llegan a S8/S9 *)
+    axBranchLost     : ARRAY[1..GVL_Param.N_LINES] OF BOOL;  (* Enclavado hasta Reset *)
+    axBayWait        : ARRAY[1..GVL_Param.N_LINES] OF BOOL;  (* Pieza paso S8/S9 y espera al robot en la bahia *)
+    aftEntry         : ARRAY[1..GVL_Param.N_LINES] OF F_TRIG;
+    artMcBusy        : ARRAY[1..GVL_Param.N_LINES] OF R_TRIG;
+    atonBayWait      : ARRAY[1..GVL_Param.N_LINES] OF TON;
 
     (* --- Gestion y KPI --- *)
     fbAlarm          : FB_AlarmManager;
@@ -146,8 +160,8 @@ IF xFirstScan THEN
     GVL_Alarm.aAlarm[12].sText := 'Wheel sorter: tiempo de transferencia excedido';
     GVL_Alarm.aAlarm[13].sText := 'MC1 (tapas) reporta error';
     GVL_Alarm.aAlarm[14].sText := 'MC2 (bases) reporta error';
-    GVL_Alarm.aAlarm[15].sText := 'MC1 (tapas): puerta de seguridad abierta';
-    GVL_Alarm.aAlarm[16].sText := 'MC2 (bases): puerta de seguridad abierta';
+    GVL_Alarm.aAlarm[15].sText := 'MC1 (tapas): puerta abierta durante el mecanizado';
+    GVL_Alarm.aAlarm[16].sText := 'MC2 (bases): puerta abierta durante el mecanizado';
     GVL_Alarm.aAlarm[17].sText := 'Atasco en la salida de tapas azules (S12)';
     GVL_Alarm.aAlarm[18].sText := 'Atasco en la salida de tapas verdes (S13)';
     GVL_Alarm.aAlarm[19].sText := 'Atasco en la salida de bases azules (S14)';
@@ -156,6 +170,7 @@ IF xFirstScan THEN
     GVL_Alarm.aAlarm[22].sText := 'Faja principal esperando cupo en una rama';
     GVL_Alarm.aAlarm[23].sText := 'Cola de seguimiento llena';
     GVL_Alarm.aAlarm[24].sText := 'Factory I/O detenido o sin comunicacion';
+    GVL_Alarm.aAlarm[25].sText := 'Piezas perdidas en M3 o en una rama (seguimiento corregido)';
     FOR i := 1 TO GVL_Param.ALARM_COUNT DO
         GVL_Alarm.aAlarm[i].eClass := E_AlarmClass.FAULT;
     END_FOR
@@ -163,6 +178,7 @@ IF xFirstScan THEN
     GVL_Alarm.aAlarm[22].eClass := E_AlarmClass.WARNING;
     GVL_Alarm.aAlarm[23].eClass := E_AlarmClass.WARNING;
     GVL_Alarm.aAlarm[24].eClass := E_AlarmClass.WARNING;
+    GVL_Alarm.aAlarm[25].eClass := E_AlarmClass.WARNING;
 END_IF
 
 (* =====================================================================
@@ -181,8 +197,17 @@ rtSelAuto (CLK := GVL_IO.xSel_Auto);
 xStartReq      := rtBtnStart.Q OR GVL_HMI.xCmdStart;
 xStopReq       := rtBtnStop.Q  OR GVL_HMI.xCmdStop;
 xResetReq      := rtBtnReset.Q OR GVL_HMI.xCmdReset;
-xModeAutoReq   := rtSelAuto.Q  OR GVL_HMI.xCmdModeAuto;
-xModeManualReq := (xSelAutoPrev AND NOT GVL_IO.xSel_Auto) OR GVL_HMI.xCmdModeManual;
+(* El giro del selector queda pendiente hasta que la celda este detenida (IDLE o MANUAL):
+   asi no se pierde si se gira durante una emergencia o una falla. *)
+IF rtSelAuto.Q THEN
+    xSelPendAuto := TRUE;
+    xSelPendMan  := FALSE;
+ELSIF xSelAutoPrev AND NOT GVL_IO.xSel_Auto THEN
+    xSelPendMan  := TRUE;
+    xSelPendAuto := FALSE;
+END_IF
+xModeAutoReq   := xSelPendAuto OR GVL_HMI.xCmdModeAuto;
+xModeManualReq := xSelPendMan  OR GVL_HMI.xCmdModeManual;
 xSelAutoPrev   := GVL_IO.xSel_Auto;
 xClearTracking := GVL_HMI.xCmdClearTracking;
 xResetCounters := GVL_HMI.xCmdResetCounters;
@@ -210,6 +235,7 @@ axEntry[1]       := GVL_IO.xS8_LidsEntry;    axEntry[2]       := GVL_IO.xS9_Base
 axMcBusy[1]      := GVL_IO.xMC1_Busy;        axMcBusy[2]      := GVL_IO.xMC2_Busy;
 axMcError[1]     := GVL_IO.xMC1_Error;       axMcError[2]     := GVL_IO.xMC2_Error;
 axMcOpened[1]    := GVL_IO.xMC1_Opened;      axMcOpened[2]    := GVL_IO.xMC2_Opened;
+aiMcProgress[1]  := GVL_IO.iMC1_Progress;    aiMcProgress[2]  := GVL_IO.iMC2_Progress;
 axGreenVision[1] := GVL_IO.xS10_GreenLid;    axGreenVision[2] := GVL_IO.xS11_GreenBase;
 axDivFront[1]    := GVL_IO.xY03_Front;       axDivFront[2]    := GVL_IO.xY04_Front;
 axDivBack[1]     := GVL_IO.xY03_Back;        axDivBack[2]     := GVL_IO.xY04_Back;
@@ -230,6 +256,8 @@ IF (eState = E_MachineState.IDLE) OR (eState = E_MachineState.MANUAL) THEN
     ELSIF xModeManualReq THEN
         xModeAuto := FALSE;
     END_IF
+    xSelPendAuto := FALSE;
+    xSelPendMan  := FALSE;
     IF GVL_HMI.xCmdApplyLot THEN
         GVL_Param.uiLotGreen := GVL_HMI.uiSetLotGreen;
         GVL_Param.uiLotBlue  := GVL_HMI.uiSetLotBlue;
@@ -256,7 +284,10 @@ FOR k := 1 TO GVL_Param.N_LINES DO
     GVL_Alarm.aAlarm[4 + 2 * k].xCondition  := afbDiv[k].xErrExtend;     (* 6 Y03, 8 Y04 *)
     GVL_Alarm.aAlarm[5 + 2 * k].xCondition  := afbDiv[k].xErrRetract;    (* 7 Y03, 9 Y04 *)
     GVL_Alarm.aAlarm[12 + k].xCondition     := axMcError[k];             (* 13 MC1, 14 MC2 *)
-    GVL_Alarm.aAlarm[14 + k].xCondition     := axMcOpened[k];            (* 15 MC1, 16 MC2 *)
+    (* En la escena la puerta de la reja queda abierta y el robot trabaja igual: solo es falla
+       si se abre con el mecanizado en curso (avance entre 1 y 99 %) durante mas de 1 s. *)
+    atonDoor[k](IN := axMcOpened[k] AND (aiMcProgress[k] > 0) AND (aiMcProgress[k] < 100), PT := T#1S);
+    GVL_Alarm.aAlarm[14 + k].xCondition     := atonDoor[k].Q;            (* 15 MC1, 16 MC2 *)
     GVL_Alarm.aAlarm[15 + 2 * k].xCondition := atonJamBlue[k].Q;         (* 17 S12, 19 S14 *)
     GVL_Alarm.aAlarm[16 + 2 * k].xCondition := atonJamGreen[k].Q;        (* 18 S13, 20 S15 *)
 END_FOR
@@ -267,11 +298,13 @@ GVL_Alarm.aAlarm[21].xCondition := xEvtStartBlocked;
 GVL_Alarm.aAlarm[22].xCondition := tonSorterWait.Q;
 GVL_Alarm.aAlarm[23].xCondition := xEvtQueueFull;
 GVL_Alarm.aAlarm[24].xCondition := NOT GVL_IO.xFio_Running;
+GVL_Alarm.aAlarm[25].xCondition := xEvtMainLost;
 
 fbAlarm(xReset := tpReset.Q, aAlarm := GVL_Alarm.aAlarm);
 
 xEvtStartBlocked := FALSE;
 xEvtQueueFull    := FALSE;
+xEvtMainLost     := FALSE;
 
 (* =====================================================================
    4. MAQUINA DE ESTADOS
@@ -403,7 +436,18 @@ IF tonGap.Q THEN
     xGapReq := FALSE;
 END_IF
 
-xMergeFree := xAutoRun AND NOT GVL_IO.xS5_MainDrop AND NOT xGapReq
+(* Contencion: si en una rama ya esperan iBranchCapacity piezas para su maquina, no se empuja
+   ni se emite nada nuevo hasta que el robot libere la bahia (el ritmo lo marca la maquina) *)
+iWip := iOnMain + aBranch[1].iCount + aBranch[2].iCount;
+FOR k := 1 TO GVL_Param.N_LINES DO
+    IF aeMcColor[k] <> E_Color.NONE THEN iWip := iWip + 1; END_IF
+    IF axAwaitDrop[k] THEN iWip := iWip + 1; END_IF
+END_FOR
+(* Limite de trabajo en proceso: un crudo nuevo entra cuando una maquina termina otro *)
+xBaysFull := (aBranch[1].iCount >= GVL_Param.iBranchCapacity)
+             OR (aBranch[2].iCount >= GVL_Param.iBranchCapacity)
+             OR (iWip >= GVL_Param.iWipMax);
+xMergeFree := xAutoRun AND NOT GVL_IO.xS5_MainDrop AND NOT xGapReq AND NOT xBaysFull
               AND (iOnMain < GVL_Param.iMainCapacity);
 FOR k := 1 TO GVL_Param.N_FEEDERS DO
     xMergeFree := xMergeFree AND NOT afbFeed[k].xBusy AND NOT axAwaitDrop[k];
@@ -434,11 +478,13 @@ FOR k := 1 TO GVL_Param.N_FEEDERS DO
     IF tpReset.Q THEN
         axAwaitDrop[k] := FALSE;       (* El operador ya reviso la transferencia *)
     END_IF
-    atonAwait[k](IN := axAwaitDrop[k] AND xEnable, PT := GVL_Param.tTransferTimeout);
+    (* El tiempo de confirmacion solo corre con M3 en marcha: si el sorter retiene M3,
+       la pieza empujada espera antes de S5 y eso no es una falla *)
+    atonAwait[k](IN := axAwaitDrop[k] AND xEnable AND fbM3.xMotor, PT := GVL_Param.tTransferTimeout);
 
     (* Emisor: solo mientras su faja avanza y el lote lo permite.
        Factory I/O no emite mientras el volumen del emisor esta ocupado. *)
-    axEmit[k] := xEnable AND ((xAutoRun AND axAllow[k] AND afbFeed[k].xBelt)
+    axEmit[k] := xEnable AND ((xAutoRun AND axAllow[k] AND NOT xBaysFull AND afbFeed[k].xBelt)
                               OR (xManualMode AND axManEmit[k]));
 END_FOR
 GVL_HMI.xManPushY01 := FALSE;
@@ -462,6 +508,8 @@ fbSorter(xEnable      := xEnable,
          xLidsOnLeft  := GVL_Param.xLidsOnLeft,
          tSettle      := GVL_Param.tSorterSettle,
          tTimeout     := GVL_Param.tSorterTimeout,
+         tEnter       := GVL_Param.tSorterEnter,
+         tDeliver     := GVL_Param.tSorterDeliver,
          xReset       := tpReset.Q,
          xResetRule   := xClearTracking AND NOT xAutoActive);
 
@@ -479,30 +527,68 @@ IF fbSorter.xDiscarded THEN
 END_IF
 tonSorterWait(IN := fbSorter.xWaitingBranch, PT := GVL_Param.tSorterWait);
 
-(* "Si hay objeto en la linea, mover la faja": M3 solo marcha con piezas *)
+(* "Si hay objeto en la linea, mover la faja": M3 solo marcha con piezas.
+   Tambien mientras se espera la caida de un empuje, para que la pieza llegue a S5
+   aunque el sensor quede un poco aguas abajo del punto de caida. *)
 fbM3(xEnable     := xEnable,
      xManualMode := xManualMode,
      xAutoMode   := xAutoActive,
-     xDemand     := (iOnMain > 0) OR (eColorRead <> E_Color.NONE),
+     xDemand     := (iOnMain > 0) OR (eColorRead <> E_Color.NONE)
+                    OR axAwaitDrop[1] OR axAwaitDrop[2],
      xHold       := fbSorter.xHoldMain,
      xManualRun  := GVL_HMI.xManM3,
      tRunOn      := GVL_Param.tRunOn);
+
+(* Piezas perdidas: M3 marcha con piezas contadas pero ninguna llega a la vision ni al sorter
+   (se cayeron o se retiraron a mano). Se corrige la cuenta y se avisa, en vez de bloquear la union. *)
+tonMainLost(IN := xAutoActive AND fbM3.xMotor AND (iOnMain > 0) AND (eColorRead = E_Color.NONE)
+                  AND (fbSorter.eStep = E_SorterStep.IDLE) AND NOT GVL_IO.xS7_Sorter,
+            PT := GVL_Param.tMainLost);
+IF tonMainLost.Q THEN
+    iOnMain      := 0;
+    xEvtMainLost := TRUE;
+END_IF
 
 (* =====================================================================
    8. ZONAS 3 Y 4: RAMAS, CENTROS DE MECANIZADO, SEGREGACION POR COLOR Y CONTEO
       La misma logica para tapas (k = 1) y bases (k = 2).
    ===================================================================== *)
 FOR k := 1 TO GVL_Param.N_LINES DO
-    (* Rama M4/M5: acerca piezas a la bahia de entrada. Si solo queda la pieza de la bahia (S8/S9)
-       la faja se detiene; si hay mas piezas sigue en marcha para que se acumulen detras de ella
-       y la boca de la rama quede libre para el wheel sorter. *)
+    (* Rama M4/M5: acerca piezas a la bahia de entrada y se detiene con la pieza en S8/S9.
+       Una sola pieza en la bahia: cuando la pieza pasa S8/S9 y entra a la bahia, la faja sigue
+       detenida hasta que el robot la toma (Is Busy sube) o vence tBayWait. Asi el robot nunca
+       encuentra dos piezas juntas (se le caian) y no se amontonan en la bahia. *)
+    aftEntry[k](CLK := axEntry[k]);
+    artMcBusy[k](CLK := axMcBusy[k]);
+    IF aftEntry[k].Q AND xAutoActive THEN
+        axBayWait[k] := TRUE;
+    END_IF
+    atonBayWait[k](IN := axBayWait[k], PT := GVL_Param.tBayWait);
+    IF artMcBusy[k].Q OR atonBayWait[k].Q OR NOT xAutoActive THEN
+        axBayWait[k] := FALSE;
+    END_IF
     afbBranch[k](xEnable     := xEnable,
                  xManualMode := xManualMode,
                  xAutoMode   := xAutoActive,
                  xDemand     := (aBranch[k].iCount > 0),
-                 xHold       := axEntry[k] AND (aBranch[k].iCount <= 1),
+                 xHold       := axEntry[k] OR axBayWait[k],
                  xManualRun  := axManBranch[k],
                  tRunOn      := GVL_Param.tRunOn);
+
+    (* La faja de la rama marcha con piezas contadas pero ninguna llega a S8/S9: piezas caidas
+       o atascadas antes de la maquina. Se avisa (alarma 25) y la cola se conserva, asi el sorter
+       no manda mas piezas encima. Con Reset (tras revisar la rama) se vacia la cola. *)
+    atonBranchLost[k](IN := xAutoActive AND afbBranch[k].xMotor AND (aBranch[k].iCount > 0)
+                            AND NOT axEntry[k],
+                      PT := GVL_Param.tMainLost);
+    IF atonBranchLost[k].Q THEN
+        axBranchLost[k] := TRUE;
+        xEvtMainLost    := TRUE;
+    END_IF
+    IF axBranchLost[k] AND tpReset.Q THEN
+        xPushOk         := FC_FifoClear(stFifo := aBranch[k]);
+        axBranchLost[k] := FALSE;
+    END_IF
 
     (* Centro de mecanizado: MC1 produce tapas, MC2 produce bases *)
     afbMC[k](xEnable      := xEnable,
@@ -542,7 +628,9 @@ FOR k := 1 TO GVL_Param.N_LINES DO
     afbOut[k](xEnable     := xEnable,
               xManualMode := xManualMode,
               xAutoMode   := xAutoActive,
-              xDemand     := (aiOnOut[k] > 0),
+              (* Tambien mientras la maquina tiene pieza: el robot deja el producto en la bahia de
+                 salida y la faja debe sacarlo de ahi para que la maquina pueda descargar *)
+              xDemand     := (aiOnOut[k] > 0) OR (aeMcColor[k] <> E_Color.NONE),
               xHold       := afbDiv[k].xHoldBelt,
               xManualRun  := axManOut[k],
               tRunOn      := GVL_Param.tRunOn);

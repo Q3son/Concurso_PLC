@@ -50,8 +50,8 @@ export const ALARMS = Object.freeze([
   { id: 12, kind: 'fault',     text: 'Wheel sorter: la pieza no terminó de pasar',          help: 'Revisa S7 y que la rama destino no esté bloqueada.' },
   { id: 13, kind: 'fault',     text: 'MC1 (tapas) reporta error',                           help: 'Pieza inválida en la bahía de entrada de MC1. Retírala y pulsa Reset.' },
   { id: 14, kind: 'fault',     text: 'MC2 (bases) reporta error',                           help: 'Pieza inválida en la bahía de entrada de MC2. Retírala y pulsa Reset.' },
-  { id: 15, kind: 'fault',     text: 'MC1 (tapas): puerta de seguridad abierta',            help: 'Cierra la puerta del centro de mecanizado y pulsa Reset.' },
-  { id: 16, kind: 'fault',     text: 'MC2 (bases): puerta de seguridad abierta',            help: 'Cierra la puerta del centro de mecanizado y pulsa Reset.' },
+  { id: 15, kind: 'fault',     text: 'MC1 (tapas): puerta abierta durante el mecanizado',   help: 'La puerta se abrió con una pieza en proceso. Ciérrala y pulsa Reset.' },
+  { id: 16, kind: 'fault',     text: 'MC2 (bases): puerta abierta durante el mecanizado',   help: 'La puerta se abrió con una pieza en proceso. Ciérrala y pulsa Reset.' },
   { id: 17, kind: 'fault',     text: 'Atasco en la salida de tapas azules (S12)',           help: 'Retira el producto detenido al final de M6.' },
   { id: 18, kind: 'fault',     text: 'Atasco en la salida de tapas verdes (S13)',           help: 'Retira el producto detenido al final de M7.' },
   { id: 19, kind: 'fault',     text: 'Atasco en la salida de bases azules (S14)',           help: 'Retira el producto detenido al final de M8.' },
@@ -60,6 +60,7 @@ export const ALARMS = Object.freeze([
   { id: 22, kind: 'warning',   text: 'Faja principal esperando cupo en una rama',           help: 'Cuello de botella en un centro de mecanizado. Revisa MC1/MC2.' },
   { id: 23, kind: 'warning',   text: 'Cola de seguimiento llena',                           help: 'Demasiadas piezas en una rama; revisa iBranchCapacity.' },
   { id: 24, kind: 'warning',   text: 'Factory I/O detenido o sin comunicación',             help: 'Pulsa Play en Factory I/O y revisa el driver Modbus.' },
+  { id: 25, kind: 'warning',   text: 'Piezas perdidas en M3 o en una rama (seguimiento corregido)', help: 'Una pieza cayó o no llegó a la visión S6.1/S6.2. Revisa la posición de los sensores y del sorter.' },
 ]);
 
 export const colorFromSensors = (green, blue) =>
